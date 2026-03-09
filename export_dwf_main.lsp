@@ -384,7 +384,7 @@
 ;;; ============================================================
 
 (defun edwf:detect (doc / ss flt-i flt-p
-                         i ent obj pt-min pt-max
+                         i ent obj bbox pt-min pt-max
                          borders minsize lyr aci)
   (setq borders nil
         minsize (edwf:g "minsize")
@@ -392,14 +392,14 @@
         aci     (edwf:g "aci"))
 
   ;; INSERT ÇÊÅÍ
-  (setq flt-i (list '(0 . "INSERT")))
+  (setq flt-i (list '(0 . "INSERT") '(410 . "Model")))
   (if (and lyr (/= lyr ""))
     (setq flt-i (append flt-i (list (cons 8 lyr)))))
   (if (and aci (> aci 0) (< aci 256))
     (setq flt-i (append flt-i (list (cons 62 aci)))))
 
   ;; LWPOLYLINE ÇÊÅÍ (´ÝÈù °Í¸¸)
-  (setq flt-p (list '(0 . "LWPOLYLINE") '(70 . 1)))
+  (setq flt-p (list '(0 . "LWPOLYLINE") '(70 . 1) '(410 . "Model")))
   (if (and lyr (/= lyr ""))
     (setq flt-p (append flt-p (list (cons 8 lyr)))))
   (if (and aci (> aci 0) (< aci 256))
@@ -413,13 +413,11 @@
         (repeat (sslength ss)
           (setq ent (ssname ss i)
                 obj (vlax-ename->vla-object ent))
-          (if (not (vl-catch-all-error-p
-                     (vl-catch-all-apply
-                       'vla-getboundingbox
-                       (list obj 'pt-min 'pt-max))))
+          (setq bbox (edwf:get-bbox-safe obj))
+          (if bbox
             (progn
-              (setq pt-min (vlax-safearray->list pt-min)
-                    pt-max (vlax-safearray->list pt-max))
+              (setq pt-min (car bbox)
+                    pt-max (cadr bbox))
               (if (and
                     (> (- (car  pt-max) (car  pt-min)) minsize)
                     (> (- (cadr pt-max) (cadr pt-min)) minsize))
@@ -481,6 +479,18 @@
     (< (abs (- (car  (cadr bbox)) (car  outer-max))) tol)
     (< (abs (- (cadr (cadr bbox)) (cadr outer-max))) tol)))
 
+(defun edwf:bbox-inside-outer-p (bbox outer-min outer-max / tol)
+  (setq tol (* 0.001
+               (max (- (car  outer-max) (car  outer-min))
+                    (- (cadr outer-max) (cadr outer-min)))))
+  (if (< tol 0.01)
+    (setq tol 0.01))
+  (and
+    (>= (car  (car  bbox)) (- (car  outer-min) tol))
+    (>= (cadr (car  bbox)) (- (cadr outer-min) tol))
+    (<= (car  (cadr bbox)) (+ (car  outer-max) tol))
+    (<= (cadr (cadr bbox)) (+ (cadr outer-max) tol))))
+
 (defun edwf:delete-object-safe (obj)
   (if obj
     (vl-catch-all-apply 'vla-delete (list obj))))
@@ -512,7 +522,7 @@
   (if (null inner)
     nil
     (progn
-      (setq ss (ssget "_C" (car inner) (cadr inner)))
+      (setq ss (ssget "_C" (car inner) (cadr inner) (list (cons 410 "Model"))))
       (if ss
         (progn
           (setq i 0)
@@ -522,7 +532,8 @@
               (progn
                 (setq obj (vlax-ename->vla-object ent)
                       bbox (edwf:get-bbox-safe obj))
-                (if bbox
+                (if (and bbox
+                         (edwf:bbox-inside-outer-p bbox outer-min outer-max))
                   (setq crop-bbox (edwf:merge-bbox crop-bbox bbox)))))
             (setq i (1+ i)))
           (if crop-bbox
@@ -613,6 +624,7 @@
                                 doc layout
                                 / plot-obj win-min win-max applied)
   (vla-put-ConfigName layout plotter)
+  (vla-RefreshPlotDeviceInfo layout)
   (if (and (edwf:g "paper") (/= (edwf:g "paper") ""))
     (progn
       (vla-put-CanonicalMediaName layout (edwf:g "paper"))
