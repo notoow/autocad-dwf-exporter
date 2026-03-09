@@ -148,8 +148,8 @@ code {
 .eyebrow {
   margin: 0 0 14px;
   color: #88e7ae;
-  font-size: 0.88rem;
-  letter-spacing: 0.14em;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -163,16 +163,16 @@ code {
 }
 
 .hero h1 {
-  font-size: clamp(3rem, 7vw, 5.6rem);
-  line-height: 0.92;
-  max-width: 10ch;
+  font-size: clamp(2.05rem, 4.85vw, 3.95rem);
+  line-height: 0.98;
+  max-width: 12ch;
 }
 
 .lede {
   max-width: 60ch;
   margin: 24px 0 0;
-  font-size: 1.08rem;
-  line-height: 1.8;
+  font-size: 0.98rem;
+  line-height: 1.72;
   color: var(--muted);
 }
 
@@ -259,8 +259,8 @@ code {
   margin: 26px 0 12px;
   max-width: 12ch;
   font-family: "Space Grotesk", sans-serif;
-  font-size: clamp(2rem, 3vw, 2.8rem);
-  line-height: 0.96;
+  font-size: clamp(1.7rem, 2.45vw, 2.35rem);
+  line-height: 1.02;
   letter-spacing: -0.04em;
 }
 
@@ -349,8 +349,8 @@ code {
 }
 
 .section-head h2 {
-  font-size: clamp(2rem, 4vw, 3.3rem);
-  line-height: 0.98;
+  font-size: clamp(1.75rem, 3.2vw, 2.75rem);
+  line-height: 1.02;
   max-width: 14ch;
 }
 
@@ -523,6 +523,7 @@ code {
   }
 
   .hero h1 {
+    font-size: clamp(1.9rem, 9.8vw, 2.85rem);
     max-width: 100%;
   }
 
