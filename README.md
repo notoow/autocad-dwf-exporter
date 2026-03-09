@@ -36,7 +36,7 @@ Batch export multiple drawing regions to individual DWF/PDF files from AutoCAD w
 ## 빠른 시작
 
 ```bash
-git clone https://github.com/yourusername/autocad-dwf-exporter.git
+git clone https://github.com/notoow/autocad-dwf-exporter.git
 ```
 
 AutoCAD에서:
