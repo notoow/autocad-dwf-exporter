@@ -124,7 +124,7 @@
 ;;; 섹션 5: DCL 파일 탐색
 ;;; ============================================================
 
-(defun edwf:find-dcl ( / dcl-name candidates result)
+(defun edwf:find-dcl ( / dcl-name candidates result f)
   ;; DCL 탐색: DWG 파일 폴더 우선 (edwf:init에서 이미 설정됨)
   ;; LSP + DCL + DWG 를 같은 폴더에 두면 어느 PC에서든 동작
   (setq dcl-name "export_dwf_ui.dcl"
@@ -136,12 +136,45 @@
       ;; 2순위: AutoCAD 검색 경로
       (findfile dcl-name)))
   (foreach c candidates
-    (if (and (null result) c (findfile c))
-      (setq result c)))
+    (if (and (null result) c)
+      (progn
+        (setq f (open c "r"))
+        (if f
+          (progn
+            (close f)
+            (setq result c))))))
   result)
 
 ;;; ============================================================
-;;; 섹션 6: 다이얼로그
+;;; 섹션 6: 플롯 정보 취득 (용지, CTB)
+;;; ============================================================
+
+(defun edwf:get-papers (plotter / acad doc layout old-cfg result lst)
+  (setq acad   (vlax-get-acad-object)
+        doc    (vla-get-activedocument acad)
+        layout (vla-get-activelayout doc))
+  (setq old-cfg (vl-catch-all-apply 'vla-get-ConfigName (list layout)))
+  (vl-catch-all-apply 'vla-put-ConfigName (list layout plotter))
+  (vl-catch-all-apply 'vla-RefreshPlotDeviceInfo (list layout))
+  (setq result (vl-catch-all-apply 'vla-GetCanonicalMediaNames (list layout)))
+  (if (not (vl-catch-all-error-p result))
+    (setq lst (vlax-safearray->list (vlax-variant-value result))))
+  (if (not (vl-catch-all-error-p old-cfg))
+    (vl-catch-all-apply 'vla-put-ConfigName (list layout old-cfg)))
+  (if lst (vl-sort lst '<) nil))
+
+(defun edwf:get-ctbs (/ acad doc layout result lst)
+  (setq acad (vlax-get-acad-object)
+        doc  (vla-get-activedocument acad)
+        layout (vla-get-activelayout doc))
+  (vl-catch-all-apply 'vla-RefreshPlotDeviceInfo (list layout))
+  (setq result (vl-catch-all-apply 'vla-GetPlotStyleTableNames (list layout)))
+  (if (not (vl-catch-all-error-p result))
+    (setq lst (vlax-safearray->list (vlax-variant-value result))))
+  (if lst (vl-sort (vl-remove-if (function (lambda (x) (= x ""))) lst) '<) nil))
+
+;;; ============================================================
+;;; 섹션 7: 다이얼로그
 ;;; ============================================================
 
 (defun edwf:run-dialog (dcl-id / dlg-result)
@@ -179,7 +212,45 @@
   (set_tile "ed_paper"   (edwf:g "paper"))
   (set_tile "ed_ctb"     (edwf:g "ctb"))
   (set_tile "ed_minsize" (itoa (edwf:g "minsize")))
-  (set_tile "txt_count"  "감지된 개수: -"))
+  (set_tile "txt_count"  "감지된 개수: -")
+  
+  (edwf:update-paper-list (edwf:g "plotter"))
+  (edwf:update-ctb-list))
+
+(defun edwf:update-paper-list (plotter)
+  (setq *edwf:paper-list* (edwf:get-papers plotter))
+  (start_list "cb_paper")
+  (add_list "- 직접 입력 -")
+  (foreach p *edwf:paper-list* (add_list p))
+  (end_list)
+  (set_tile "cb_paper" "0"))
+
+(defun edwf:update-ctb-list ()
+  (setq *edwf:ctb-list* (edwf:get-ctbs))
+  (start_list "cb_ctb")
+  (add_list "- 직접 입력 -")
+  (add_list "- 없음 -")
+  (foreach c *edwf:ctb-list* (add_list c))
+  (end_list)
+  (set_tile "cb_ctb" "0"))
+
+(defun edwf:cb-paper-action (val / idx p)
+  (setq idx (atoi val))
+  (if (> idx 0)
+    (progn
+      (setq p (nth (1- idx) *edwf:paper-list*))
+      (set_tile "ed_paper" p)
+      (edwf:s "paper" p))))
+
+(defun edwf:cb-ctb-action (val / idx c)
+  (setq idx (atoi val))
+  (cond
+    ((= idx 0) nil)
+    ((= idx 1) (set_tile "ed_ctb" "") (edwf:s "ctb" ""))
+    (T
+      (setq c (nth (- idx 2) *edwf:ctb-list*))
+      (set_tile "ed_ctb" c)
+      (edwf:s "ctb" c))))
 
 (defun edwf:dlg-callbacks ()
   (action_tile "rb_sample" "(edwf:s \"mode\" \"sample\")")
@@ -189,11 +260,15 @@
   (action_tile "rb_dwf"
     (strcat "(edwf:s \"format\" \"DWF\")"
             "(edwf:s \"plotter\" \"DWF6 ePlot.pc3\")"
-            "(edwf:s \"ext\" \".dwf\")"))
+            "(edwf:s \"ext\" \".dwf\")"
+            "(edwf:s \"paper\" \"\")(set_tile \"ed_paper\" \"\")"
+            "(edwf:update-paper-list \"DWF6 ePlot.pc3\")"))
   (action_tile "rb_pdf"
     (strcat "(edwf:s \"format\" \"PDF\")"
             "(edwf:s \"plotter\" \"DWG To PDF.pc3\")"
-            "(edwf:s \"ext\" \".pdf\")"))
+            "(edwf:s \"ext\" \".pdf\")"
+            "(edwf:s \"paper\" \"\")(set_tile \"ed_paper\" \"\")"
+            "(edwf:update-paper-list \"DWG To PDF.pc3\")"))
 
   (action_tile "btn_browse"  "(edwf:browse-folder)")
   (action_tile "btn_preview" "(edwf:dlg-save)(edwf:dlg-preview)")
@@ -203,7 +278,9 @@
     "(edwf:s \"aci\" (if (= $value \"\") 0 (atoi $value)))")
   (action_tile "ed_folder"  "(edwf:s \"folder\"  $value)")
   (action_tile "ed_prefix"  "(edwf:s \"prefix\"  $value)")
+  (action_tile "cb_paper"   "(edwf:cb-paper-action $value)")
   (action_tile "ed_paper"   "(edwf:s \"paper\"   $value)")
+  (action_tile "cb_ctb"     "(edwf:cb-ctb-action $value)")
   (action_tile "ed_ctb"     "(edwf:s \"ctb\"     $value)")
   (action_tile "ed_minsize"
     "(edwf:s \"minsize\" (if (= $value \"\") 500 (atoi $value)))")
@@ -250,7 +327,7 @@
       (vlax-release-object shell))))
 
 ;;; ============================================================
-;;; 섹션 7: 샘플 선택
+;;; 섹션 8: 샘플 선택
 ;;; ============================================================
 
 (defun edwf:pick-sample ( / ent obj lyr dxf-color)
@@ -275,7 +352,7 @@
           (princ (strcat "\n  레이어: " lyr "  색상: ByLayer")))))))
 
 ;;; ============================================================
-;;; 섹션 8: 테두리 감지
+;;; 섹션 9: 테두리 감지
 ;;; ============================================================
 
 (defun edwf:detect (doc / ss flt-i flt-p
@@ -336,7 +413,7 @@
     borders))
 
 ;;; ============================================================
-;;; 섹션 9: 정렬
+;;; 섹션 10: 정렬
 ;;; ============================================================
 
 (defun edwf:sort (borders / hs avg-h thr)
@@ -358,7 +435,7 @@
               (> ay by) (< ax bx))))))))
 
 ;;; ============================================================
-;;; 섹션 10: 플롯 엔진
+;;; 섹션 11: 플롯 엔진
 ;;; ============================================================
 
 (defun edwf:plot-one (pt-min pt-max filepath plotter doc layout)
@@ -373,7 +450,7 @@
                              old-cfg old-paper-name old-ctb-name old-ptype old-ustd
                              old-scale old-rot old-center
                              old-bgplot old-err
-                             result fallback-p)
+                             result fallback-p applied)
 
   (setq fallback-p nil)
   (setq old-bgplot (getvar "BACKGROUNDPLOT"))
@@ -402,7 +479,12 @@
   ;; 플롯 설정 적용
   (vl-catch-all-apply 'vla-put-ConfigName       (list layout plotter))
   (if (and (edwf:g "paper") (/= (edwf:g "paper") ""))
-    (vl-catch-all-apply 'vla-put-CanonicalMediaName (list layout (edwf:g "paper"))))
+    (progn
+      (vl-catch-all-apply 'vla-put-CanonicalMediaName (list layout (edwf:g "paper")))
+      (setq applied (vl-catch-all-apply 'vla-get-CanonicalMediaName (list layout)))
+      (if (or (vl-catch-all-error-p applied)
+              (not (wcmatch (strcase applied) (strcase (edwf:g "paper")))))
+        (princ (strcat "\n    [경고] 용지 '" (edwf:g "paper") "' 등록 안됨 → 기본 용지로 출력됨")))))
   (if (and (edwf:g "ctb") (/= (edwf:g "ctb") ""))
     (vl-catch-all-apply 'vla-put-StyleSheet     (list layout (edwf:g "ctb"))))
   (vl-catch-all-apply 'vla-put-PlotType         (list layout 4))
@@ -540,7 +622,7 @@
     nil))
 
 ;;; ============================================================
-;;; 섹션 11: 내보내기 실행
+;;; 섹션 12: 내보내기 실행
 ;;; ============================================================
 
 (defun edwf:run-export (doc / borders sorted layout
@@ -589,7 +671,7 @@
       (princ "\n================================================\n"))))
 
 ;;; ============================================================
-;;; 섹션 12: 텍스트 모드
+;;; 섹션 13: 텍스트 모드
 ;;; ============================================================
 
 (defun edwf:textmode (doc / mode fmt folder tmp-aci)
