@@ -199,6 +199,7 @@
                            (> (edwf:g "sample-aci") 0))
                     (strcat "  ACI:" (itoa (edwf:g "sample-aci")))
                     "  (ByLayer)"))))
+            (edwf:dlg-preview)
             (setq dlg-result (start_dialog)))))
       dlg-result)))
 
@@ -325,11 +326,17 @@
   (setq tmp-aci (get_tile "ed_aci"))
   (edwf:s "aci" (if (or (null tmp-aci) (= tmp-aci "")) 0 (atoi tmp-aci))))
 
-(defun edwf:dlg-preview ( / doc bds)
-  (setq doc (vla-get-activedocument (vlax-get-acad-object)))
+(defun edwf:get-detect-count (doc / bds)
   (setq bds (edwf:detect doc))
+  (if bds (length bds) 0))
+
+(defun edwf:update-count-tile (doc)
   (set_tile "txt_count"
-    (strcat "감지된 개수: " (itoa (if bds (length bds) 0)) "개")))
+    (strcat "감지된 개수: " (itoa (edwf:get-detect-count doc)) "개")))
+
+(defun edwf:dlg-preview ( / doc)
+  (setq doc (vla-get-activedocument (vlax-get-acad-object)))
+  (edwf:update-count-tile doc))
 
 (defun edwf:browse-folder ( / shell fo fp)
   (setq shell
