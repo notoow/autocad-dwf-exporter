@@ -36,7 +36,7 @@ Batch export multiple drawing regions to individual DWF/PDF files from AutoCAD w
 ## 빠른 시작
 
 ```bash
-git clone https://github.com/notoow/autocad-dwf-exporter.git
+git clone https://github.com/yourusername/autocad-dwf-exporter.git
 ```
 
 AutoCAD에서:
@@ -74,7 +74,6 @@ autocad-dwf-exporter/
   DWF/PDF 일괄 내보내기  v5
   AutoCAD R25
 ================================================
-  레이어: FORM
   22개 감지. 정렬 중...
   [1/22] 도면1.dwf OK
   [2/22] 도면2.dwf OK
