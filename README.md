@@ -56,6 +56,12 @@ AutoCAD에서 `PDF 일괄 출력`, `DWF 일괄 내보내기`, `도면 낱장 저
 
 `encode_euckr.py`, `.vscode/settings.json`, `README.md`는 개발/관리용입니다.
 
+### Social Preview / OG 이미지
+
+- 저장소용 social preview 이미지 파일: `assets/social-preview.png`
+- GitHub 저장소 `Settings > Social preview` 에서 업로드하면 링크 미리보기 카드에 반영됩니다.
+- 현재 이미지는 `1280x640 PNG` 기준으로 제작되어 있습니다.
+
 ### 빠른 시작
 
 1. `export_dwf_main.lsp` 와 `export_dwf_ui.dcl` 을 대상 `.dwg` 와 같은 폴더에 둡니다.
@@ -153,6 +159,12 @@ Only these two files are required for normal use:
 - `export_dwf_ui.dcl`
 
 Place them in the same folder as the target `.dwg` whenever possible.
+
+### Social Preview / OG Image
+
+- Repository social preview asset: `assets/social-preview.png`
+- Upload it in `Settings > Social preview` on GitHub to affect link preview cards.
+- The current image is prepared as a `1280x640 PNG`.
 
 ### Quick Start
 
