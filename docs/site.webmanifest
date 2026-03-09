@@ -1,0 +1,16 @@
+{
+  "name": "AutoCAD Sheet Exporter",
+  "short_name": "Sheet Exporter",
+  "start_url": "/autocad-dwf-exporter/",
+  "display": "standalone",
+  "background_color": "#0d1011",
+  "theme_color": "#101314",
+  "icons": [
+    {
+      "src": "./assets/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

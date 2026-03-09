@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://notoow.github.io/autocad-dwf-exporter/sitemap.xml

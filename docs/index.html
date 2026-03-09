@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AutoCAD PDF/DWF Batch Exporter | AutoLISP Sheet Export</title>
+    <meta
+      name="description"
+      content="AutoCAD PDF 일괄 출력, DWF 일괄 내보내기, batch plot, sheet export를 위한 AutoLISP 도구. 모델 공간 테두리 감지, 자동 용지 맞춤, PDF+DWF 동시 출력 지원."
+    />
+    <meta
+      name="keywords"
+      content="AutoCAD PDF 일괄 출력, AutoCAD DWF export, AutoCAD batch plot, AutoCAD sheet export, AutoLISP PDF export, AutoCAD 도면 낱장 출력"
+    />
+    <meta name="theme-color" content="#101314" />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <link rel="canonical" href="https://notoow.github.io/autocad-dwf-exporter/" />
+    <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="AutoCAD Sheet Exporter" />
+    <meta property="og:title" content="AutoCAD PDF/DWF Batch Exporter" />
+    <meta
+      property="og:description"
+      content="모델 공간 테두리를 감지해 PDF, DWF, 또는 PDF+DWF로 낱장 출력하는 AutoLISP 배치 내보내기 도구."
+    />
+    <meta property="og:url" content="https://notoow.github.io/autocad-dwf-exporter/" />
+    <meta
+      property="og:image"
+      content="https://notoow.github.io/autocad-dwf-exporter/assets/social-preview.png"
+    />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AutoCAD PDF/DWF Batch Exporter" />
+    <meta
+      name="twitter:description"
+      content="AutoCAD PDF 일괄 출력, DWF export, batch plot, sheet export를 위한 AutoLISP Pages 랜딩 페이지."
+    />
+    <meta
+      name="twitter:image"
+      content="https://notoow.github.io/autocad-dwf-exporter/assets/social-preview.png"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareSourceCode",
+        "name": "AutoCAD Sheet Exporter",
+        "description": "AutoCAD PDF/DWF batch exporter for model-space sheet borders with auto-fit paper selection, crop modes, preview counts, and PDF+DWF dual export.",
+        "codeRepository": "https://github.com/notoow/autocad-dwf-exporter",
+        "programmingLanguage": "AutoLISP",
+        "runtimePlatform": "AutoCAD 2015-2025",
+        "license": "https://github.com/notoow/autocad-dwf-exporter/blob/main/LICENSE",
+        "keywords": [
+          "AutoCAD PDF batch export",
+          "AutoCAD DWF export",
+          "AutoCAD batch plot",
+          "AutoCAD sheet export",
+          "AutoLISP PDF export",
+          "AutoCAD 도면 낱장 출력"
+        ],
+        "author": {
+          "@type": "Person",
+          "name": "notoow"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="ambient ambient-a"></div>
+    <div class="ambient ambient-b"></div>
+    <div class="grain"></div>
+
+    <header class="topbar shell">
+      <a class="brand" href="#top">
+        <span class="brand-mark">AE</span>
+        <span class="brand-copy">
+          <strong>AutoCAD Sheet Exporter</strong>
+          <small>PDF / DWF / AutoLISP</small>
+        </span>
+      </a>
+      <nav class="nav">
+        <a href="#features">Features</a>
+        <a href="#install">Install</a>
+        <a href="#keywords">Keywords</a>
+        <a href="https://github.com/notoow/autocad-dwf-exporter">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero shell reveal">
+        <div class="hero-copy">
+          <p class="eyebrow">AutoCAD PDF Batch Export · DWF Export · Sheet Plot</p>
+          <h1>모델 공간 테두리를 감지해, 낱장 단위로 더 빠르게 뽑습니다.</h1>
+          <p class="lede">
+            AutoCAD에서 <strong>PDF 일괄 출력</strong>, <strong>DWF 일괄 내보내기</strong>,
+            <strong>batch plot</strong>, <strong>sheet export</strong>가 필요할 때 쓰는
+            AutoLISP 도구입니다. 자동 용지 맞춤, 내용 크롭, 샘플 선택 후 감지 개수 미리보기,
+            그리고 <strong>PDF + DWF 동시 출력</strong>까지 지원합니다.
+          </p>
+          <div class="cta-row">
+            <a class="button button-primary" href="https://github.com/notoow/autocad-dwf-exporter">
+              GitHub에서 보기
+            </a>
+            <a class="button button-secondary" href="#install">바로 설치하기</a>
+          </div>
+          <ul class="signal-row">
+            <li>AutoCAD 2015-2025</li>
+            <li>INSERT + LWPOLYLINE</li>
+            <li>Auto Fit Paper</li>
+            <li>PDF + DWF</li>
+          </ul>
+        </div>
+
+        <div class="hero-stage">
+          <article class="glass-panel panel-main">
+            <div class="panel-top">
+              <span class="pill pill-green">EXPORT-SHEETS</span>
+              <span class="pill pill-soft">2026 Landing</span>
+            </div>
+            <h2>Auto-fit paper selection with per-sheet export</h2>
+            <p>
+              방향이 아니라 결과를 맞춥니다. 시트 크기 기준으로 가장 가까운 용지를 잡고,
+              PDF 또는 DWF를 낱장으로 정리합니다.
+            </p>
+            <div class="eq-bars" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+          </article>
+
+          <article class="glass-panel panel-card panel-card-a">
+            <span class="chip">Preview</span>
+            <strong>샘플 선택 후 자동 개수 계산</strong>
+            <p>같은 조건의 테두리가 몇 개인지 다이얼로그에서 바로 확인.</p>
+          </article>
+
+          <article class="glass-panel panel-card panel-card-b">
+            <span class="chip">Crop</span>
+            <strong>Border / Content</strong>
+            <p>테두리 기준 또는 내부 객체 기준으로 출력 윈도우 선택.</p>
+          </article>
+
+          <article class="glass-panel panel-card panel-card-c">
+            <span class="chip">Output</span>
+            <strong>PDF + DWF in one run</strong>
+            <p>시트마다 두 형식을 순차 생성해 배포와 검토를 한 번에.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="shell section reveal" id="features">
+        <div class="section-head">
+          <p class="eyebrow">Why It Feels Faster</p>
+          <h2>배치 플롯이 아니라, 낱장 추출 워크플로우에 맞춘 구성</h2>
+        </div>
+        <div class="card-grid">
+          <article class="feature-card">
+            <span class="feature-index">01</span>
+            <h3>AutoCAD PDF 일괄 출력</h3>
+            <p>모델 공간 테두리를 감지해 시트마다 개별 PDF를 저장합니다.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-index">02</span>
+            <h3>DWF export + dual export</h3>
+            <p>DWF만, PDF만, 또는 PDF+DWF 둘 다 한 번에 생성할 수 있습니다.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-index">03</span>
+            <h3>Auto-fit paper logic</h3>
+            <p>표준 용지를 강제하지 않고, 시트 크기에 가장 근접한 용지를 자동 선택합니다.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-index">04</span>
+            <h3>Custom paper override</h3>
+            <p>특수 상황에서는 플로터에 등록된 커스텀 용지명을 정확히 직접 지정할 수 있습니다.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-index">05</span>
+            <h3>Sample-driven detection</h3>
+            <p>테두리 하나를 클릭하면 레이어와 ACI를 잡아 같은 조건의 시트를 자동 찾습니다.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-index">06</span>
+            <h3>ActiveX with fallback</h3>
+            <p>AutoCAD 2016+에서는 ActiveX, 실패 시 -PLOT 폴백으로 배치가 끊기지 않게 설계했습니다.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="shell section split reveal">
+        <div class="section-head compact">
+          <p class="eyebrow">Flow</p>
+          <h2>실제 사용 흐름은 짧고 단순합니다.</h2>
+        </div>
+        <div class="timeline">
+          <article class="timeline-item">
+            <span>01</span>
+            <div>
+              <h3>APPLOAD</h3>
+              <p><code>export_dwf_main.lsp</code> 를 로드합니다.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <span>02</span>
+            <div>
+              <h3>샘플 선택 또는 레이어 지정</h3>
+              <p>샘플 테두리를 클릭하거나 레이어/ACI 조건으로 감지 대상을 정합니다.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <span>03</span>
+            <div>
+              <h3>출력 형식 선택</h3>
+              <p><code>DWF</code>, <code>PDF</code>, <code>PDF + DWF</code> 중에서 고릅니다.</p>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <span>04</span>
+            <div>
+              <h3>자동 용지 맞춤 후 저장</h3>
+              <p>시트 크기에 가장 가까운 용지를 적용하고 낱장 파일로 떨어뜨립니다.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="shell section reveal" id="keywords">
+        <div class="section-head">
+          <p class="eyebrow">Search Intent</p>
+          <h2>이런 검색어로 찾는 사용자에게 맞는 페이지입니다.</h2>
+        </div>
+        <div class="keyword-cloud">
+          <span>AutoCAD PDF 일괄 출력</span>
+          <span>AutoCAD PDF 자동 저장</span>
+          <span>AutoCAD DWF export</span>
+          <span>AutoCAD batch plot</span>
+          <span>AutoCAD sheet export</span>
+          <span>AutoLISP PDF export</span>
+          <span>도면 낱장 출력</span>
+          <span>모델 공간 테두리 감지</span>
+          <span>custom paper name</span>
+          <span>per-sheet drawing export</span>
+        </div>
+      </section>
+
+      <section class="shell section install reveal" id="install">
+        <div class="section-head">
+          <p class="eyebrow">Install</p>
+          <h2>배포는 두 파일이면 끝납니다.</h2>
+        </div>
+        <div class="install-layout">
+          <article class="glass-panel install-card">
+            <h3>실사용 배포 파일</h3>
+            <ul class="clean-list">
+              <li><code>export_dwf_main.lsp</code></li>
+              <li><code>export_dwf_ui.dcl</code></li>
+            </ul>
+            <p>대상 DWG와 같은 폴더에 두고, AutoCAD에서 <code>APPLOAD</code> 후 <code>EXPORT-SHEETS</code> 를 실행하면 됩니다.</p>
+          </article>
+          <article class="glass-panel install-card">
+            <h3>개발용 보조 파일</h3>
+            <ul class="clean-list">
+              <li><code>encode_euckr.py</code></li>
+              <li><code>README.md</code></li>
+              <li><code>assets/social-preview.png</code></li>
+            </ul>
+            <p>배포 파일 자체는 CP949 기준으로 관리하고, README와 Pages는 UTF-8로 유지합니다.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="shell section final-cta reveal">
+        <article class="glass-panel final-panel">
+          <p class="eyebrow">Open Source Utility</p>
+          <h2>GitHub에서 코드, 배포 파일, README, Pages를 함께 관리합니다.</h2>
+          <p>
+            저장소 설명, topics, social preview, Pages 랜딩 페이지까지 정리해 두면
+            GitHub 검색과 외부 링크 공유 모두에서 유리합니다.
+          </p>
+          <div class="cta-row">
+            <a class="button button-primary" href="https://github.com/notoow/autocad-dwf-exporter">
+              Repository 열기
+            </a>
+            <a class="button button-secondary" href="./assets/social-preview.png">
+              OG Image 보기
+            </a>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <footer class="shell footer">
+      <p>AutoCAD Sheet Exporter · AutoLISP · PDF / DWF Batch Export · GitHub Pages</p>
+    </footer>
+  </body>
+</html>
