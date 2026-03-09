@@ -11,7 +11,6 @@
 ;;; 전제조건:
 ;;;   - 테두리 블록이 "FORM" 레이어에 삽입되어 있음
 ;;;   - DWF6 ePlot.pc3 드라이버 설치됨
-;;;   - CTB 파일: samjung-2.ctb (자동 적용)
 ;;; ============================================================
 
 (vl-load-com)
@@ -202,5 +201,5 @@
 
 (princ "\n[export_dwf_by_block.lsp 로드 완료]")
 (princ "\n  명령어: EXPORT-DWF")
-(princ "\n  대상: FORM 레이어의 '삼정환경 도면 폼' 블록 22개")
+(princ "\n  대상: FORM 레이어의 블록참조")
 (princ)
