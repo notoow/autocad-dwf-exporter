@@ -1,33 +1,26 @@
 ;;; ============================================================
 ;;; export_dwf_main.lsp  v5
 ;;;
-;;; ê¸°ëŠ¥: ëª¨ë¸ ê³µê°„ì˜ ë¸”ë¡ì°¸ì¡°(INSERT) ë˜ëŠ” í´ë¦¬ë¼ì¸ í…Œë‘ë¦¬ë¥¼
-;;;       ê°ì§€í•˜ì—¬ ê°ê° DWF ë˜ëŠ” PDF ë¡œ ì¼ê´„ ë‚´ë³´ë‚´ê¸°
+;;; ±â´É: ¸ğµ¨ °ø°£ÀÇ ºí·ÏÂüÁ¶(INSERT) ¶Ç´Â Æú¸®¶óÀÎ Å×µÎ¸®¸¦
+;;;       °¨ÁöÇÏ¿© °¢°¢ DWF ¶Ç´Â PDF ·Î ÀÏ°ı ³»º¸³»±â
 ;;;
-;;; ì§€ì›: AutoCAD 2015 ~ 2025 (R19 ~ R25), í•œ/ì˜ ëª¨ë‘ ë™ì‘
+;;; Áö¿ø: AutoCAD 2015 ~ 2025 (R19 ~ R25), ÇÑ/¿µ ¸ğµÎ µ¿ÀÛ
 ;;;
-;;; íŒŒì¼ êµ¬ì„± (ê°™ì€ í´ë”ì— ìœ„ì¹˜):
-;;;   - export_dwf_main.lsp  (ì´ íŒŒì¼)
-;;;   - export_dwf_ui.dcl    (ë‹¤ì´ì–¼ë¡œê·¸)
+;;; ÆÄÀÏ ±¸¼º (°°Àº Æú´õ¿¡ À§Ä¡):
+;;;   - export_dwf_main.lsp  (ÀÌ ÆÄÀÏ)
+;;;   - export_dwf_ui.dcl    (´ÙÀÌ¾ó·Î±×)
 ;;;
-;;; ì‚¬ìš©ë²•: APPLOAD â†’ export_dwf_main.lsp â†’ ëª…ë ¹: EXPORT-DWF
+;;; »ç¿ë¹ı: APPLOAD ¡æ export_dwf_main.lsp ¡æ ¸í·É: EXPORT-DWF
 ;;;
-;;; í”Œë¡¯ ì—”ì§„ (ë²„ì „ ìë™ ì„ íƒ):
-;;;   R21+(2016~): ActiveX PlotToFile  â†’ ì‹¤íŒ¨ ì‹œ -PLOT ìë™ í´ë°±
-;;;   R20-(2015) : -PLOT ëª…ë ¹
+;;; ÇÃ·Ô ¿£Áø (¹öÀü ÀÚµ¿ ¼±ÅÃ):
+;;;   R21+(2016~): ActiveX PlotToFile  ¡æ ½ÇÆĞ ½Ã -PLOT ÀÚµ¿ Æú¹é
+;;;   R20-(2015) : -PLOT ¸í·É
 ;;; ============================================================
 
 (vl-load-com)
 
-;;; ë¡œë“œ ì‹œì (APPLOAD ì¤‘)ì— ì´ íŒŒì¼ì˜ í´ë” ê²½ë¡œë¥¼ ì „ì—­ë³€ìˆ˜ë¡œ ì €ì¥
-;;; APPLOAD ì‹¤í–‰ ì¤‘ì—ëŠ” findfileì´ ì´ íŒŒì¼ì„ ì°¾ì„ ìˆ˜ ìˆìŒ
-(setq *edwf:dir*
-  (if (findfile "export_dwf_main.lsp")
-    (vl-filename-directory (findfile "export_dwf_main.lsp"))
-    ""))
-
 ;;; ============================================================
-;;; ì„¹ì…˜ 1: ì„¤ì • ê´€ë¦¬
+;;; ¼½¼Ç 1: ¼³Á¤ °ü¸®
 ;;; ============================================================
 
 (setq *edwf:cfg* nil)
@@ -45,7 +38,7 @@
       (cons "folder"     (if (and fp (/= fp ""))
                            (vl-filename-directory fp)
                            "C:\\Temp"))
-      (cons "prefix"     "ë„ë©´")
+      (cons "prefix"     "µµ¸é")
       (cons "minsize"    500)
       (cons "sample-lyr" nil)
       (cons "sample-aci" nil))))
@@ -58,16 +51,16 @@
     (setq *edwf:cfg* (cons  (cons k v)   *edwf:cfg*))))
 
 ;;; ============================================================
-;;; ì„¹ì…˜ 2: AutoCAD ë²„ì „ ê°ì§€
+;;; ¼½¼Ç 2: AutoCAD ¹öÀü °¨Áö
 ;;; ============================================================
 
 (defun edwf:acad-ver ()
-  ;; ACADVER ì˜ˆ: "25.0s", "24.1", "25,0" (ë¡œì»¬ë¼ì´ì¦ˆ)
-  ;; atoiëŠ” ì²« ë¹„ìˆ«ì ë¬¸ìì—ì„œ ì¤‘ë‹¨ â†’ ì£¼ ë²„ì „ ì •ìˆ˜ ë°˜í™˜
+  ;; ACADVER ¿¹: "25.0s", "24.1", "25,0" (·ÎÄÃ¶óÀÌÁî)
+  ;; atoi´Â Ã¹ ºñ¼ıÀÚ ¹®ÀÚ¿¡¼­ Áß´Ü ¡æ ÁÖ ¹öÀü Á¤¼ö ¹İÈ¯
   (atoi (getvar "ACADVER")))
 
 ;;; ============================================================
-;;; ì„¹ì…˜ 3: ìœ í‹¸ë¦¬í‹° - ì¤‘ì²© í´ë” ìƒì„±
+;;; ¼½¼Ç 3: À¯Æ¿¸®Æ¼ - ÁßÃ¸ Æú´õ »ı¼º
 ;;; ============================================================
 
 (defun edwf:ensure-dir (path)
@@ -77,7 +70,7 @@
   (cond
     ((vl-file-directory-p path) T)
     ((>= depth 20)
-     (princ (strcat "\n  [ê²½ê³ ] í´ë” ìƒì„± ê¹Šì´ ì´ˆê³¼: " path))
+     (princ (strcat "\n  [°æ°í] Æú´õ »ı¼º ±íÀÌ ÃÊ°ú: " path))
      nil)
     (T
      (setq parent (vl-filename-directory path))
@@ -87,7 +80,7 @@
      (vl-file-directory-p path))))
 
 ;;; ============================================================
-;;; ì„¹ì…˜ 4: ë©”ì¸ ëª…ë ¹
+;;; ¼½¼Ç 4: ¸ŞÀÎ ¸í·É
 ;;; ============================================================
 
 (defun c:EXPORT-DWF ( / acad doc dcl-file dcl-id dlg-result)
@@ -97,70 +90,71 @@
   (edwf:init doc)
 
   (princ "\n================================================")
-  (princ "\n  DWF/PDF ì¼ê´„ ë‚´ë³´ë‚´ê¸°  v5")
+  (princ "\n  DWF/PDF ÀÏ°ı ³»º¸³»±â  v5")
   (princ (strcat "\n  AutoCAD R" (itoa (edwf:acad-ver))))
-  (princ (strcat "\n  ì—”ì§„: "
+  (princ (strcat "\n  ¿£Áø: "
     (if (>= (edwf:acad-ver) 21)
-      "ActiveX (+ -PLOT í´ë°±)"
-      "-PLOT ëª…ë ¹")))
+      "ActiveX (+ -PLOT Æú¹é)"
+      "-PLOT ¸í·É")))
   (princ "\n================================================")
 
   (setq dcl-file (edwf:find-dcl))
 
   (cond
     ((null dcl-file)
-     (princ "\n  DCL ì—†ìŒ â†’ í…ìŠ¤íŠ¸ ëª¨ë“œ")
+     (princ "\n  DCL ¾øÀ½ ¡æ ÅØ½ºÆ® ¸ğµå")
      (edwf:textmode doc))
     (T
      (setq dcl-id (load_dialog dcl-file))
      (cond
        ((< dcl-id 0)
-        (princ "\n  DCL ë¡œë“œ ì‹¤íŒ¨ â†’ í…ìŠ¤íŠ¸ ëª¨ë“œ")
+        (princ "\n  DCL ·Îµå ½ÇÆĞ ¡æ ÅØ½ºÆ® ¸ğµå")
         (edwf:textmode doc))
        (T
         (setq dlg-result (edwf:run-dialog dcl-id))
         (unload_dialog dcl-id)
         (cond
           ((= dlg-result 1) (edwf:run-export doc))
-          (T                (princ "\nì·¨ì†Œë¨.")))))))
+          (T                (princ "\nÃë¼ÒµÊ.")))))))
   (princ))
 
 ;;; ============================================================
-;;; ì„¹ì…˜ 5: DCL íŒŒì¼ íƒìƒ‰
+;;; ¼½¼Ç 5: DCL ÆÄÀÏ Å½»ö
 ;;; ============================================================
 
-(defun edwf:find-dcl ( / candidates result)
-  ;; *edwf:dir* = ë¡œë“œ ì‹œì ì— ì €ì¥í•œ ì´ LSP íŒŒì¼ì˜ í´ë”
-  ;; â†’ ì–´ëŠ ê²½ë¡œì— ì„¤ì¹˜í•´ë„ DCL ìë™ íƒìƒ‰
-  (setq result nil)
+(defun edwf:find-dcl ( / dcl-name candidates result)
+  ;; DCL Å½»ö: DWG ÆÄÀÏ Æú´õ ¿ì¼± (edwf:init¿¡¼­ ÀÌ¹Ì ¼³Á¤µÊ)
+  ;; LSP + DCL + DWG ¸¦ °°Àº Æú´õ¿¡ µÎ¸é ¾î´À PC¿¡¼­µç µ¿ÀÛ
+  (setq dcl-name "export_dwf_ui.dcl"
+        result   nil)
   (setq candidates
     (list
-      (if (and *edwf:dir* (/= *edwf:dir* ""))
-        (strcat *edwf:dir* "\\export_dwf_ui.dcl"))
-      (findfile "export_dwf_ui.dcl")
-      (strcat (edwf:g "folder") "\\export_dwf_ui.dcl")))
+      ;; 1¼øÀ§: DWG¿Í °°Àº Æú´õ (edwf:init¿¡¼­ ¼³Á¤ÇÑ folder°ª)
+      (strcat (edwf:g "folder") "\\" dcl-name)
+      ;; 2¼øÀ§: AutoCAD °Ë»ö °æ·Î
+      (findfile dcl-name)))
   (foreach c candidates
     (if (and (null result) c (findfile c))
       (setq result c)))
   result)
 
 ;;; ============================================================
-;;; ì„¹ì…˜ 6: ë‹¤ì´ì–¼ë¡œê·¸
+;;; ¼½¼Ç 6: ´ÙÀÌ¾ó·Î±×
 ;;; ============================================================
 
 (defun edwf:run-dialog (dcl-id / dlg-result)
   (if (not (new_dialog "export_dwf_dialog" dcl-id))
-    (progn (princ "\në‹¤ì´ì–¼ë¡œê·¸ ìƒì„± ì‹¤íŒ¨.") 0)
+    (progn (princ "\n´ÙÀÌ¾ó·Î±× »ı¼º ½ÇÆĞ.") 0)
     (progn
       (edwf:dlg-init)
       (edwf:dlg-callbacks)
       (setq dlg-result (start_dialog))
 
-      ;; ìƒ˜í”Œ ì„ íƒ ë£¨í”„ (done_dialog 2)
+      ;; »ùÇÃ ¼±ÅÃ ·çÇÁ (done_dialog 2)
       (while (= dlg-result 2)
         (edwf:pick-sample)
         (if (not (new_dialog "export_dwf_dialog" dcl-id))
-          (progn (princ "\nì¬ì˜¤í”ˆ ì‹¤íŒ¨.") (setq dlg-result 0))
+          (progn (princ "\nÀç¿ÀÇÂ ½ÇÆĞ.") (setq dlg-result 0))
           (progn
             (edwf:dlg-init)
             (edwf:dlg-callbacks)
@@ -181,7 +175,7 @@
   (set_tile "ed_folder"  (edwf:g "folder"))
   (set_tile "ed_prefix"  (edwf:g "prefix"))
   (set_tile "ed_minsize" (itoa (edwf:g "minsize")))
-  (set_tile "txt_count"  "ê°ì§€ëœ ê°œìˆ˜: -"))
+  (set_tile "txt_count"  "°¨ÁöµÈ °³¼ö: -"))
 
 (defun edwf:dlg-callbacks ()
   (action_tile "rb_sample" "(edwf:s \"mode\" \"sample\")")
@@ -224,7 +218,7 @@
   (setq doc (vla-get-activedocument (vlax-get-acad-object)))
   (setq bds (edwf:detect doc))
   (set_tile "txt_count"
-    (strcat "ê°ì§€ëœ ê°œìˆ˜: " (itoa (if bds (length bds) 0)) "ê°œ")))
+    (strcat "°¨ÁöµÈ °³¼ö: " (itoa (if bds (length bds) 0)) "°³")))
 
 (defun edwf:browse-folder ( / shell fo fp)
   (setq shell
@@ -233,7 +227,7 @@
     (progn
       (setq fo
         (vl-catch-all-apply 'vlax-invoke-method
-          (list shell 'BrowseForFolder 0 "ì €ì¥ í´ë” ì„ íƒ" 0 "")))
+          (list shell 'BrowseForFolder 0 "ÀúÀå Æú´õ ¼±ÅÃ" 0 "")))
       (if (and fo (not (vl-catch-all-error-p fo)))
         (progn
           (setq fp
@@ -248,14 +242,14 @@
       (vlax-release-object shell))))
 
 ;;; ============================================================
-;;; ì„¹ì…˜ 7: ìƒ˜í”Œ ì„ íƒ
+;;; ¼½¼Ç 7: »ùÇÃ ¼±ÅÃ
 ;;; ============================================================
 
 (defun edwf:pick-sample ( / ent obj lyr dxf-color)
-  (princ "\ní…Œë‘ë¦¬ ê°ì²´ë¥¼ í´ë¦­í•˜ì„¸ìš” (INSERT ë˜ëŠ” LWPOLYLINE)...")
-  (setq ent (car (entsel "\nì„ íƒ: ")))
+  (princ "\nÅ×µÎ¸® °´Ã¼¸¦ Å¬¸¯ÇÏ¼¼¿ä (INSERT ¶Ç´Â LWPOLYLINE)...")
+  (setq ent (car (entsel "\n¼±ÅÃ: ")))
   (if (null ent)
-    (princ "\n  ì„ íƒ ì·¨ì†Œ.")
+    (princ "\n  ¼±ÅÃ Ãë¼Ò.")
     (progn
       (setq obj (vlax-ename->vla-object ent))
       (setq lyr (vla-get-layer obj))
@@ -266,14 +260,14 @@
         (progn
           (edwf:s "sample-aci" dxf-color)
           (edwf:s "aci"        dxf-color)
-          (princ (strcat "\n  ë ˆì´ì–´: " lyr "  ACI: " (itoa dxf-color))))
+          (princ (strcat "\n  ·¹ÀÌ¾î: " lyr "  ACI: " (itoa dxf-color))))
         (progn
           (edwf:s "sample-aci" 0)
           (edwf:s "aci"        0)
-          (princ (strcat "\n  ë ˆì´ì–´: " lyr "  ìƒ‰ìƒ: ByLayer")))))))
+          (princ (strcat "\n  ·¹ÀÌ¾î: " lyr "  »ö»ó: ByLayer")))))))
 
 ;;; ============================================================
-;;; ì„¹ì…˜ 8: í…Œë‘ë¦¬ ê°ì§€
+;;; ¼½¼Ç 8: Å×µÎ¸® °¨Áö
 ;;; ============================================================
 
 (defun edwf:detect (doc / ss flt-i flt-p
@@ -284,14 +278,14 @@
         lyr     (edwf:g "layer")
         aci     (edwf:g "aci"))
 
-  ;; INSERT í•„í„°
+  ;; INSERT ÇÊÅÍ
   (setq flt-i (list '(0 . "INSERT")))
   (if (and lyr (/= lyr ""))
     (setq flt-i (append flt-i (list (cons 8 lyr)))))
   (if (and aci (> aci 0) (< aci 256))
     (setq flt-i (append flt-i (list (cons 62 aci)))))
 
-  ;; LWPOLYLINE í•„í„° (ë‹«íŒ ê²ƒë§Œ)
+  ;; LWPOLYLINE ÇÊÅÍ (´İÈù °Í¸¸)
   (setq flt-p (list '(0 . "LWPOLYLINE") '(70 . 1)))
   (if (and lyr (/= lyr ""))
     (setq flt-p (append flt-p (list (cons 8 lyr)))))
@@ -334,7 +328,7 @@
     borders))
 
 ;;; ============================================================
-;;; ì„¹ì…˜ 9: ì •ë ¬
+;;; ¼½¼Ç 9: Á¤·Ä
 ;;; ============================================================
 
 (defun edwf:sort (borders / hs avg-h thr)
@@ -356,7 +350,7 @@
               (> ay by) (< ax bx))))))))
 
 ;;; ============================================================
-;;; ì„¹ì…˜ 10: í”Œë¡¯ ì—”ì§„
+;;; ¼½¼Ç 10: ÇÃ·Ô ¿£Áø
 ;;; ============================================================
 
 (defun edwf:plot-one (pt-min pt-max filepath plotter doc layout)
@@ -364,7 +358,7 @@
     (edwf:plot-activex pt-min pt-max filepath plotter doc layout)
     (edwf:plot-command pt-min pt-max filepath plotter)))
 
-;;; â”€â”€ ë°©ë²• A: ActiveX (R21+) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+;;; ¦¡¦¡ ¹æ¹ı A: ActiveX (R21+) ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
 (defun edwf:plot-activex (pt-min pt-max filepath plotter
                            doc layout
                            / plot-obj win-min win-max
@@ -377,7 +371,7 @@
   (setq old-bgplot (getvar "BACKGROUNDPLOT"))
   (setvar "BACKGROUNDPLOT" 0)
 
-  ;; ë ˆì´ì•„ì›ƒ ë°±ì—… (error ë“±ë¡ ì „ì— ì™„ë£Œ)
+  ;; ·¹ÀÌ¾Æ¿ô ¹é¾÷ (error µî·Ï Àü¿¡ ¿Ï·á)
   (setq old-cfg    (vl-catch-all-apply 'vla-get-ConfigName       (list layout))
         old-ptype  (vl-catch-all-apply 'vla-get-PlotType         (list layout))
         old-ustd   (vl-catch-all-apply 'vla-get-UseStandardScale (list layout))
@@ -385,7 +379,7 @@
         old-rot    (vl-catch-all-apply 'vla-get-PlotRotation     (list layout))
         old-center (vl-catch-all-apply 'vla-get-CenterPlot       (list layout)))
 
-  ;; *error* ë“±ë¡
+  ;; *error* µî·Ï
   (setq old-err *error*)
   (defun *error* (msg)
     (edwf:restore-layout layout
@@ -393,9 +387,9 @@
     (setvar "BACKGROUNDPLOT" old-bgplot)
     (setq *error* old-err)
     (if (not (wcmatch (strcase msg) "*CANCEL*,*QUIT*,*EXIT*"))
-      (princ (strcat "\n    ActiveX ì˜¤ë¥˜: " msg))))
+      (princ (strcat "\n    ActiveX ¿À·ù: " msg))))
 
-  ;; í”Œë¡¯ ì„¤ì • ì ìš©
+  ;; ÇÃ·Ô ¼³Á¤ Àû¿ë
   (vl-catch-all-apply 'vla-put-ConfigName       (list layout plotter))
   (vl-catch-all-apply 'vla-put-PlotType         (list layout 4))
   (vl-catch-all-apply 'vla-put-UseStandardScale (list layout :vlax-true))
@@ -403,7 +397,7 @@
   (vl-catch-all-apply 'vla-put-PlotRotation     (list layout 0))
   (vl-catch-all-apply 'vla-put-CenterPlot       (list layout :vlax-true))
 
-  ;; ìœˆë„ìš° ì˜ì—­
+  ;; À©µµ¿ì ¿µ¿ª
   (setq win-min (vlax-make-safearray vlax-vbDouble '(0 . 1))
         win-max (vlax-make-safearray vlax-vbDouble '(0 . 1)))
   (vlax-safearray-put-element win-min 0 (car  pt-min))
@@ -412,32 +406,32 @@
   (vlax-safearray-put-element win-max 1 (cadr pt-max))
   (vl-catch-all-apply 'vla-SetWindowToPlot (list layout win-min win-max))
 
-  ;; Plot ê°ì²´
+  ;; Plot °´Ã¼
   (setq plot-obj
     (vl-catch-all-apply 'vlax-get-property (list doc 'Plot)))
 
-  ;; ì‹¤í–‰
+  ;; ½ÇÇà
   (cond
     ((or (null plot-obj) (vl-catch-all-error-p plot-obj))
-     (princ "\n    Plot ê°ì²´ ì‹¤íŒ¨ â†’ -PLOT í´ë°±")
+     (princ "\n    Plot °´Ã¼ ½ÇÆĞ ¡æ -PLOT Æú¹é")
      (setq fallback-p T))
     (T
      (setq result
        (vl-catch-all-apply 'vla-PlotToFile (list plot-obj filepath)))
      (if (vl-catch-all-error-p result)
        (progn
-         (princ (strcat "\n    PlotToFile ì‹¤íŒ¨: "
+         (princ (strcat "\n    PlotToFile ½ÇÆĞ: "
                   (vl-catch-all-error-message result)
-                  " â†’ -PLOT í´ë°±"))
+                  " ¡æ -PLOT Æú¹é"))
          (setq fallback-p T)))))
 
-  ;; ë³µì›
+  ;; º¹¿ø
   (edwf:restore-layout layout
     old-cfg old-ptype old-ustd old-scale old-rot old-center)
   (setvar "BACKGROUNDPLOT" old-bgplot)
   (setq *error* old-err)
 
-  ;; ê²°ê³¼
+  ;; °á°ú
   (cond
     (fallback-p
      (edwf:plot-command pt-min pt-max filepath plotter))
@@ -446,7 +440,7 @@
     (T
      (princ " FAIL") nil)))
 
-;;; â”€â”€ ë ˆì´ì•„ì›ƒ ë³µì› í—¬í¼ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+;;; ¦¡¦¡ ·¹ÀÌ¾Æ¿ô º¹¿ø ÇïÆÛ ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
 (defun edwf:restore-layout (layout cfg ptype ustd scale rot center)
   (if (and cfg    (not (vl-catch-all-error-p cfg)))
     (vl-catch-all-apply 'vla-put-ConfigName       (list layout cfg)))
@@ -461,10 +455,10 @@
   (if (and center (not (vl-catch-all-error-p center)))
     (vl-catch-all-apply 'vla-put-CenterPlot       (list layout center))))
 
-;;; â”€â”€ ë°©ë²• B: -PLOT ëª…ë ¹ (R20 ì´í•˜ / í´ë°±) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-;;; Model íƒ­ + ê°€ìƒ í”Œë¡œí„° ê¸°ì¤€ í”„ë¡¬í”„íŠ¸ ìˆœì„œ.
-;;; "Scale lineweights" í”„ë¡¬í”„íŠ¸ê°€ ì—†ëŠ” AutoCAD ë²„ì „ì—ì„œëŠ”
-;;; ì´í›„ ì‘ë‹µì´ ë°€ë¦´ ìˆ˜ ìˆìŒ (FAIL ë©”ì‹œì§€ë¡œ ì•ˆë‚´).
+;;; ¦¡¦¡ ¹æ¹ı B: -PLOT ¸í·É (R20 ÀÌÇÏ / Æú¹é) ¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡
+;;; Model ÅÇ + °¡»ó ÇÃ·ÎÅÍ ±âÁØ ÇÁ·ÒÇÁÆ® ¼ø¼­.
+;;; "Scale lineweights" ÇÁ·ÒÇÁÆ®°¡ ¾ø´Â AutoCAD ¹öÀü¿¡¼­´Â
+;;; ÀÌÈÄ ÀÀ´äÀÌ ¹Ğ¸± ¼ö ÀÖÀ½ (FAIL ¸Ş½ÃÁö·Î ¾È³»).
 (defun edwf:plot-command (pt-min pt-max filepath plotter
                            / old-ce old-bg old-fd old-err
                              x1s y1s x2s y2s plot-ok)
@@ -472,7 +466,7 @@
   (defun *error* (msg)
     (setq plot-ok nil)
     (if (not (wcmatch (strcase msg) "*CANCEL*,*QUIT*,*EXIT*"))
-      (princ (strcat "\n    -PLOT ì˜¤ë¥˜: " msg)))
+      (princ (strcat "\n    -PLOT ¿À·ù: " msg)))
     (setvar "CMDECHO"        old-ce)
     (setvar "BACKGROUNDPLOT" old-bg)
     (setvar "FILEDIA"        old-fd)
@@ -494,26 +488,26 @@
 
   (command
     "_.-PLOT"
-    "_Yes"                          ; ìƒì„¸ ì„¤ì •
-    ""                              ; í˜„ì¬ ë ˆì´ì•„ì›ƒ
-    plotter                         ; í”Œë¡œí„°
-    ""                              ; ìš©ì§€ (í˜„ì¬ ìœ ì§€)
-    ""                              ; ë‹¨ìœ„ (í˜„ì¬ ìœ ì§€)
-    ""                              ; ë°©í–¥ (í˜„ì¬ ìœ ì§€)
-    "_No"                           ; ë’¤ì§‘ê¸°
-    "_Window"                       ; ì˜ì—­
-    (strcat x1s "," y1s)            ; ì¢Œí•˜ë‹¨
-    (strcat x2s "," y2s)            ; ìš°ìƒë‹¨
-    "_Fit"                          ; ìŠ¤ì¼€ì¼
-    "0,0"                           ; ì˜¤í”„ì…‹
-    "_Yes"                          ; í”Œë¡¯ ìŠ¤íƒ€ì¼
-    ""                              ; CTB (í˜„ì¬ ìœ ì§€)
-    "_Yes"                          ; ì„ ê°€ì¤‘ì¹˜
-    "_No"                           ; ì„ ê°€ì¤‘ì¹˜ ìŠ¤ì¼€ì¼ë§
-    "_Yes"                          ; íŒŒì¼ì— í”Œë¡¯ (ê°€ìƒ í”Œë¡œí„° í•„ìˆ˜)
-    filepath                        ; íŒŒì¼ ê²½ë¡œ
-    "_No"                           ; ì„¤ì • ì €ì¥ ì•ˆ í•¨
-    "_Yes"                          ; ì§„í–‰
+    "_Yes"                          ; »ó¼¼ ¼³Á¤
+    ""                              ; ÇöÀç ·¹ÀÌ¾Æ¿ô
+    plotter                         ; ÇÃ·ÎÅÍ
+    ""                              ; ¿ëÁö (ÇöÀç À¯Áö)
+    ""                              ; ´ÜÀ§ (ÇöÀç À¯Áö)
+    ""                              ; ¹æÇâ (ÇöÀç À¯Áö)
+    "_No"                           ; µÚÁı±â
+    "_Window"                       ; ¿µ¿ª
+    (strcat x1s "," y1s)            ; ÁÂÇÏ´Ü
+    (strcat x2s "," y2s)            ; ¿ì»ó´Ü
+    "_Fit"                          ; ½ºÄÉÀÏ
+    "0,0"                           ; ¿ÀÇÁ¼Â
+    "_Yes"                          ; ÇÃ·Ô ½ºÅ¸ÀÏ
+    ""                              ; CTB (ÇöÀç À¯Áö)
+    "_Yes"                          ; ¼±°¡ÁßÄ¡
+    "_No"                           ; ¼±°¡ÁßÄ¡ ½ºÄÉÀÏ¸µ
+    "_Yes"                          ; ÆÄÀÏ¿¡ ÇÃ·Ô (°¡»ó ÇÃ·ÎÅÍ ÇÊ¼ö)
+    filepath                        ; ÆÄÀÏ °æ·Î
+    "_No"                           ; ¼³Á¤ ÀúÀå ¾È ÇÔ
+    "_Yes"                          ; ÁøÇà
   )
 
   (setvar "CMDECHO"        old-ce)
@@ -524,11 +518,11 @@
   (if plot-ok
     (if (findfile filepath)
       (progn (princ " OK") T)
-      (progn (princ " FAIL (í”„ë¡¬í”„íŠ¸ ë¶ˆì¼ì¹˜ ê°€ëŠ¥)") nil))
+      (progn (princ " FAIL (ÇÁ·ÒÇÁÆ® ºÒÀÏÄ¡ °¡´É)") nil))
     nil))
 
 ;;; ============================================================
-;;; ì„¹ì…˜ 11: ë‚´ë³´ë‚´ê¸° ì‹¤í–‰
+;;; ¼½¼Ç 11: ³»º¸³»±â ½ÇÇà
 ;;; ============================================================
 
 (defun edwf:run-export (doc / borders sorted layout
@@ -538,9 +532,9 @@
   (setq borders (edwf:detect doc))
 
   (if (or (null borders) (= (length borders) 0))
-    (princ "\n[ì˜¤ë¥˜] í…Œë‘ë¦¬ ì—†ìŒ. ë ˆì´ì–´ëª… / ACI / ìµœì†Œ í¬ê¸° í™•ì¸.")
+    (princ "\n[¿À·ù] Å×µÎ¸® ¾øÀ½. ·¹ÀÌ¾î¸í / ACI / ÃÖ¼Ò Å©±â È®ÀÎ.")
     (progn
-      (princ (strcat "\n  " (itoa (length borders)) "ê°œ ê°ì§€. ì •ë ¬ ì¤‘..."))
+      (princ (strcat "\n  " (itoa (length borders)) "°³ °¨Áö. Á¤·Ä Áß..."))
       (setq sorted (edwf:sort borders))
 
       (setq folder  (edwf:g "folder")
@@ -570,32 +564,32 @@
         (setq cnt (1+ cnt)))
 
       (princ "\n\n================================================")
-      (princ (strcat "\n  ì„±ê³µ: " (itoa ok-cnt) "ê°œ"))
+      (princ (strcat "\n  ¼º°ø: " (itoa ok-cnt) "°³"))
       (if (> fail-cnt 0)
-        (princ (strcat "\n  ì‹¤íŒ¨: " (itoa fail-cnt) "ê°œ")))
-      (princ (strcat "\n  ìœ„ì¹˜: " folder))
+        (princ (strcat "\n  ½ÇÆĞ: " (itoa fail-cnt) "°³")))
+      (princ (strcat "\n  À§Ä¡: " folder))
       (princ "\n================================================\n"))))
 
 ;;; ============================================================
-;;; ì„¹ì…˜ 12: í…ìŠ¤íŠ¸ ëª¨ë“œ
+;;; ¼½¼Ç 12: ÅØ½ºÆ® ¸ğµå
 ;;; ============================================================
 
 (defun edwf:textmode (doc / mode fmt folder tmp-aci)
-  (princ "\n[í…ìŠ¤íŠ¸ ëª¨ë“œ]\n")
+  (princ "\n[ÅØ½ºÆ® ¸ğµå]\n")
 
   (initget "Sample Layer")
-  (setq mode (getkword "\nê°ì§€ [Sample í´ë¦­/Layer ì´ë¦„] <Sample>: "))
+  (setq mode (getkword "\n°¨Áö [Sample Å¬¸¯/Layer ÀÌ¸§] <Sample>: "))
   (if (null mode) (setq mode "Sample"))
 
   (if (= mode "Sample")
     (edwf:pick-sample)
     (progn
-      (edwf:s "layer" (getstring T "\në ˆì´ì–´ëª…: "))
-      (setq tmp-aci (getint "\nACI ë²ˆí˜¸ (0=ì „ì²´): "))
+      (edwf:s "layer" (getstring T "\n·¹ÀÌ¾î¸í: "))
+      (setq tmp-aci (getint "\nACI ¹øÈ£ (0=ÀüÃ¼): "))
       (edwf:s "aci" (if tmp-aci tmp-aci 0))))
 
   (initget "DWF PDF")
-  (setq fmt (getkword "\ní˜•ì‹ [DWF/PDF] <DWF>: "))
+  (setq fmt (getkword "\nÇü½Ä [DWF/PDF] <DWF>: "))
   (cond
     ((= fmt "PDF")
      (edwf:s "format" "PDF")
@@ -607,7 +601,7 @@
      (edwf:s "ext" ".dwf")))
 
   (setq folder
-    (getstring T (strcat "\ní´ë” [" (edwf:g "folder") "]: ")))
+    (getstring T (strcat "\nÆú´õ [" (edwf:g "folder") "]: ")))
   (if (and folder (/= folder ""))
     (edwf:s "folder" folder))
 
@@ -617,10 +611,10 @@
 (princ "\n================================================")
 (princ "\n  export_dwf_main.lsp v5")
 (princ (strcat "\n  AutoCAD R" (itoa (edwf:acad-ver))))
-(princ (strcat "\n  ì—”ì§„: "
+(princ (strcat "\n  ¿£Áø: "
   (if (>= (edwf:acad-ver) 21)
-    "ActiveX (ì‹¤íŒ¨ ì‹œ -PLOT ìë™ í´ë°±)"
-    "-PLOT ëª…ë ¹")))
-(princ "\n  ëª…ë ¹: EXPORT-DWF")
+    "ActiveX (½ÇÆĞ ½Ã -PLOT ÀÚµ¿ Æú¹é)"
+    "-PLOT ¸í·É")))
+(princ "\n  ¸í·É: EXPORT-DWF")
 (princ "\n================================================")
 (princ)
