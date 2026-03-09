@@ -61,14 +61,32 @@ EXPORT-DWF
  → 내보내기 시작
 ```
 
+## 인코딩 작업 흐름
+
+이 프로젝트는 한국어 AutoCAD 호환성을 위해 배포용 `.lsp`, `.dcl` 파일을
+**CP949 (ANSI/EUC-KR)** 기준으로 관리합니다.
+
+- VS Code에서는 포함된 `.vscode/settings.json` 설정을 사용합니다
+- 한글이 깨져 보이면 `Korean (Windows 949)`로 다시 엽니다
+- UTF-8로 먼저 수정했다면 AutoCAD에 넣기 전에 변환합니다
+
+```bash
+python encode_euckr.py export_dwf_main.lsp
+python encode_euckr.py export_dwf_ui.dcl
+```
+
+- 같은 파일에 덮어쓸 때는 `.utf8.bak` 백업이 자동 생성됩니다
+
 ## 파일 구조
 
 ```
 autocad-dwf-exporter/
 ├── README.md
 ├── .gitignore
+├── encode_euckr.py         # UTF-8 -> CP949 변환 도우미
 ├── export_dwf_main.lsp     # 메인 스크립트 (EXPORT-DWF 명령)
-└── export_dwf_ui.dcl       # DCL 다이얼로그 정의
+├── export_dwf_ui.dcl       # DCL 다이얼로그 정의
+└── .vscode/settings.json   # VS Code 인코딩/줄바꿈 권장 설정
 ```
 
 ## 전제조건
@@ -148,9 +166,27 @@ EXPORT-DWF
 autocad-dwf-exporter/
 ├── README.md
 ├── .gitignore
+├── encode_euckr.py         # UTF-8 -> CP949 conversion helper
 ├── export_dwf_main.lsp     # Core script (EXPORT-DWF command)
-└── export_dwf_ui.dcl       # UI Dialog definition
+├── export_dwf_ui.dcl       # UI dialog definition
+└── .vscode/settings.json   # Recommended VS Code encoding settings
 ```
+
+## Encoding Workflow
+
+This project targets Korean AutoCAD environments, so the distributable `.lsp` and
+`.dcl` files are kept in **CP949 (ANSI/EUC-KR)** for compatibility.
+
+- Use the included `.vscode/settings.json` for VS Code
+- If text looks garbled, reopen the file with `Korean (Windows 949)`
+- If you edit in UTF-8 first, convert before loading in AutoCAD
+
+```bash
+python encode_euckr.py export_dwf_main.lsp
+python encode_euckr.py export_dwf_ui.dcl
+```
+
+- Overwrite conversion creates a `.utf8.bak` backup automatically
 
 ## Prerequisites
 

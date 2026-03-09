@@ -12,6 +12,18 @@
 # DWF output files
 *.dwf
 
+# Python helpers
+__pycache__/
+*.pyc
+
+# Local scratch files
+current_code.txt
+fix_section6.py
+
+# Editor settings
+.vscode/*
+!.vscode/settings.json
+
 # OS files
 Thumbs.db
 .DS_Store
