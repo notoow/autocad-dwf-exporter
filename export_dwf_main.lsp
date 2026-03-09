@@ -173,11 +173,41 @@
       (setq *edwf:paper-cache* (cons (cons key papers) *edwf:paper-cache*))
       papers)))
 
+(defun edwf:merge-ci-lists (lst1 lst2 / merged)
+  (setq merged nil)
+  (foreach item (append lst1 lst2)
+    (if (null (edwf:index-ci item merged))
+      (setq merged (cons item merged))))
+  (if merged
+    (vl-sort merged '<)
+    nil))
+
+(defun edwf:format-targets ( / fmt)
+  (setq fmt (strcase (edwf:g "format")))
+  (cond
+    ((= fmt "PDF")
+     (list (list "PDF" "DWG To PDF.pc3" ".pdf")))
+    ((= fmt "BOTH")
+     (list
+       (list "DWF" "DWF6 ePlot.pc3" ".dwf")
+       (list "PDF" "DWG To PDF.pc3" ".pdf")))
+    (T
+     (list (list "DWF" "DWF6 ePlot.pc3" ".dwf")))))
+
+(defun edwf:ui-paper-list (layout / papers)
+  (setq papers nil)
+  (foreach target (edwf:format-targets)
+    (setq papers
+      (edwf:merge-ci-lists
+        papers
+        (edwf:get-papers-cached (cadr target) layout))))
+  papers)
+
 (defun edwf:resolve-auto-paper (plotter layout pt-min pt-max
                                  / size target-w target-h papers dims
-                                   paper-w paper-h fit-score dist-score
-                                   best-fit best-fit-name
-                                   best-fallback best-fallback-score)
+                                    paper-w paper-h fit-score dist-score
+                                    best-fit best-fit-name
+                                    best-fallback best-fallback-score)
   (setq size     (edwf:window-size-mm pt-min pt-max)
         target-w (car size)
         target-h (cadr size)
@@ -222,6 +252,27 @@
   (setq width  (abs (- (car  pt-max) (car  pt-min)))
         height (abs (- (cadr pt-max) (cadr pt-min))))
   (if (> width height) "_Landscape" "_Portrait"))
+
+(defun edwf:apply-format (fmt)
+  (cond
+    ((= fmt "PDF")
+     (edwf:s "format"  "PDF")
+     (edwf:s "plotter" "DWG To PDF.pc3")
+     (edwf:s "ext"     ".pdf"))
+    ((= fmt "BOTH")
+     (edwf:s "format"  "BOTH")
+     (edwf:s "plotter" "DWF6 ePlot.pc3")
+     (edwf:s "ext"     ".dwf"))
+    (T
+     (edwf:s "format"  "DWF")
+     (edwf:s "plotter" "DWF6 ePlot.pc3")
+     (edwf:s "ext"     ".dwf")))
+  (edwf:s "paper" "AUTO"))
+
+(defun edwf:set-format (fmt)
+  (edwf:apply-format fmt)
+  (set_tile "ed_paper" "자동")
+  (edwf:update-paper-list (edwf:g "plotter")))
 
 ;;; ============================================================
 ;;; 섹션 2: AutoCAD 버전 감지
@@ -382,8 +433,9 @@
 (defun edwf:dlg-init ()
   (set_tile "rb_sample"  (if (= (edwf:g "mode") "layer") "0" "1"))
   (set_tile "rb_layer"   (if (= (edwf:g "mode") "layer") "1" "0"))
-  (set_tile "rb_dwf"     (if (= (edwf:g "format") "PDF") "0" "1"))
+  (set_tile "rb_dwf"     (if (= (edwf:g "format") "DWF") "1" "0"))
   (set_tile "rb_pdf"     (if (= (edwf:g "format") "PDF") "1" "0"))
+  (set_tile "rb_both"    (if (= (edwf:g "format") "BOTH") "1" "0"))
   (set_tile "ed_layer"   (if (edwf:g "layer") (edwf:g "layer") ""))
   (set_tile "ed_aci"     (if (> (edwf:g "aci") 0)
                            (itoa (edwf:g "aci")) ""))
@@ -410,10 +462,10 @@
   (setq acad   (vlax-get-acad-object)
         doc    (vla-get-activedocument acad)
         layout (vla-get-activelayout doc))
-  (setq *edwf:paper-list* (edwf:get-papers-cached plotter layout))
+  (setq *edwf:paper-list* (edwf:ui-paper-list layout))
   (start_list "cb_paper")
   (add_list "- 자동 맞춤 (기본) -")
-  (add_list "- 용지명 직접 입력 -")
+  (add_list "- 특수/사용자정의 용지명 -")
   (foreach p *edwf:paper-list* (add_list p))
   (end_list)
   (set_tile "cb_paper"
@@ -476,18 +528,9 @@
   (action_tile "rb_layer"  "(edwf:s \"mode\" \"layer\")")
   (action_tile "btn_pick"  "(done_dialog 2)")
 
-  (action_tile "rb_dwf"
-    (strcat "(edwf:s \"format\" \"DWF\")"
-            "(edwf:s \"plotter\" \"DWF6 ePlot.pc3\")"
-            "(edwf:s \"ext\" \".dwf\")"
-            "(edwf:s \"paper\" \"AUTO\")(set_tile \"ed_paper\" \"자동\")"
-            "(edwf:update-paper-list \"DWF6 ePlot.pc3\")"))
-  (action_tile "rb_pdf"
-    (strcat "(edwf:s \"format\" \"PDF\")"
-            "(edwf:s \"plotter\" \"DWG To PDF.pc3\")"
-            "(edwf:s \"ext\" \".pdf\")"
-            "(edwf:s \"paper\" \"AUTO\")(set_tile \"ed_paper\" \"자동\")"
-            "(edwf:update-paper-list \"DWG To PDF.pc3\")"))
+  (action_tile "rb_dwf"  "(edwf:set-format \"DWF\")")
+  (action_tile "rb_pdf"  "(edwf:set-format \"PDF\")")
+  (action_tile "rb_both" "(edwf:set-format \"BOTH\")")
 
   (action_tile "btn_browse"  "(edwf:browse-folder)")
   (action_tile "btn_preview" "(edwf:dlg-save)(edwf:dlg-preview)")
@@ -1028,10 +1071,22 @@
 ;;; 섹션 12: 내보내기 실행
 ;;; ============================================================
 
-(defun edwf:run-export (doc / borders sorted layout
-                              cnt ok-cnt fail-cnt
-                              pt-min pt-max fpath result
-                              folder prefix plotter ext plot-window)
+(defun edwf:run-export-target (doc sheet-idx job-idx total-jobs
+                                   pt-min pt-max folder prefix target
+                                   / layout plotter ext fpath)
+  (setq layout  (vla-get-activelayout doc)
+        plotter (cadr target)
+        ext     (caddr target)
+        fpath   (strcat folder "\\" prefix (itoa sheet-idx) ext))
+  (princ (strcat "\n  [" (itoa job-idx) "/"
+                 (itoa total-jobs) "] "
+                 prefix (itoa sheet-idx) ext))
+  (edwf:plot-one pt-min pt-max fpath plotter doc layout))
+
+(defun edwf:run-export (doc / borders sorted targets total-jobs
+                              sheet-idx job-idx ok-cnt fail-cnt
+                              pt-min pt-max result
+                              folder prefix plot-window)
   (setq borders (edwf:detect doc))
 
   (if (or (null borders) (= (length borders) 0))
@@ -1039,34 +1094,33 @@
     (progn
       (princ (strcat "\n  " (itoa (length borders)) "개 감지. 정렬 중..."))
       (setq sorted (edwf:sort borders))
+      (setq targets (edwf:format-targets))
+      (setq total-jobs (* (length sorted) (length targets)))
 
       (setq folder  (edwf:g "folder")
-            prefix  (edwf:g "prefix")
-            plotter (edwf:g "plotter")
-            ext     (edwf:g "ext"))
+            prefix  (edwf:g "prefix"))
 
       (edwf:ensure-dir folder)
 
-      (setq cnt      1
+      (setq sheet-idx 1
+            job-idx  1
             ok-cnt   0
             fail-cnt 0)
 
       (foreach bd sorted
-        ;; 매 루프마다 layout 객체 갱신
-        (setq layout (vla-get-activelayout doc))
         (setq plot-window (edwf:get-output-window bd)
               pt-min (car  plot-window)
-              pt-max (cadr plot-window)
-              fpath  (strcat folder "\\" prefix (itoa cnt) ext))
-        (princ (strcat "\n  [" (itoa cnt) "/"
-                       (itoa (length sorted)) "] "
-                       prefix (itoa cnt) ext))
-        (setq result
-          (edwf:plot-one pt-min pt-max fpath plotter doc layout))
-        (if result
-          (setq ok-cnt (1+ ok-cnt))
-          (setq fail-cnt (1+ fail-cnt)))
-        (setq cnt (1+ cnt)))
+              pt-max (cadr plot-window))
+        (foreach target targets
+          (setq result
+            (edwf:run-export-target
+              doc sheet-idx job-idx total-jobs
+              pt-min pt-max folder prefix target))
+          (if result
+            (setq ok-cnt (1+ ok-cnt))
+            (setq fail-cnt (1+ fail-cnt)))
+          (setq job-idx (1+ job-idx)))
+        (setq sheet-idx (1+ sheet-idx)))
 
       (princ "\n\n================================================")
       (princ (strcat "\n  성공: " (itoa ok-cnt) "개"))
@@ -1093,17 +1147,15 @@
       (setq tmp-aci (getint "\nACI 번호 (0=전체): "))
       (edwf:s "aci" (if tmp-aci tmp-aci 0))))
 
-  (initget "DWF PDF")
-  (setq fmt (getkword "\n형식 [DWF/PDF] <DWF>: "))
+  (initget "DWF PDF Both")
+  (setq fmt (getkword "\n형식 [DWF/PDF/Both] <DWF>: "))
   (cond
     ((= fmt "PDF")
-     (edwf:s "format" "PDF")
-     (edwf:s "plotter" "DWG To PDF.pc3")
-     (edwf:s "ext" ".pdf"))
+     (edwf:apply-format "PDF"))
+    ((= fmt "Both")
+     (edwf:apply-format "BOTH"))
     (T
-     (edwf:s "format" "DWF")
-     (edwf:s "plotter" "DWF6 ePlot.pc3")
-     (edwf:s "ext" ".dwf")))
+     (edwf:apply-format "DWF")))
 
   (initget "Border Content")
   (if (= (getkword "\n출력 범위 [Border/Content] <Border>: ") "Content")

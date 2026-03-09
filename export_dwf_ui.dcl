@@ -49,6 +49,7 @@ export_dwf_dialog : dialog {
     : radio_row {
       : radio_button { key = "rb_dwf"; label = "DWF  (DWF6 ePlot.pc3)"; value = "1"; }
       : radio_button { key = "rb_pdf"; label = "PDF  (DWG To PDF.pc3)"; value = "0"; }
+      : radio_button { key = "rb_both"; label = "PDF + DWF"; value = "0"; }
     }
   }
 
@@ -63,7 +64,7 @@ export_dwf_dialog : dialog {
     : row {
       : text     { label = "파일 접두사:"; width = 12; }
       : edit_box { key = "ed_prefix";  edit_width = 16; value = "도면"; }
-      : text     { label = "  (도면1.dwf, 도면2.dwf ...)"; }
+      : text     { label = "  (도면1.dwf / 도면1.pdf ...)"; }
     }
     : row {
       : text     { label = "최소 크기:"; width = 10; }
@@ -88,7 +89,7 @@ export_dwf_dialog : dialog {
       : popup_list { key = "cb_paper"; width = 30; }
       : edit_box   { key = "ed_paper"; edit_width = 16; value = "자동"; }
     }
-    : text         { label = "  * 기본은 자동 맞춤 / 필요 시 정확한 용지명을 직접 입력"; }
+    : text         { label = "  * 기본은 자동 맞춤 / 특수·사용자정의 용지는 정확한 용지명을 직접 입력"; }
     : row {
       : text       { label = "플롯 스타일:"; width = 10; }
       : popup_list { key = "cb_ctb"; width = 30; }
