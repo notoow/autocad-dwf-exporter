@@ -19,6 +19,13 @@
 
 (vl-load-com)
 
+;;; 로드 시점(APPLOAD 중)에 이 파일의 폴더 경로를 전역변수로 저장
+;;; APPLOAD 실행 중에는 findfile이 이 파일을 찾을 수 있음
+(setq *edwf:dir*
+  (if (findfile "export_dwf_main.lsp")
+    (vl-filename-directory (findfile "export_dwf_main.lsp"))
+    ""))
+
 ;;; ============================================================
 ;;; 섹션 1: 설정 관리
 ;;; ============================================================
@@ -123,17 +130,17 @@
 ;;; ============================================================
 
 (defun edwf:find-dcl ( / candidates result)
+  ;; *edwf:dir* = 로드 시점에 저장된 이 LSP 파일의 폴더
+  ;; → 어떤 경로에 설치해도 DCL을 자동으로 찾음
   (setq result nil)
   (setq candidates
     (list
+      (if (and *edwf:dir* (/= *edwf:dir* ""))
+        (strcat *edwf:dir* "\\export_dwf_ui.dcl"))
       (findfile "export_dwf_ui.dcl")
-      (if (findfile "export_dwf_main.lsp")
-        (strcat
-          (vl-filename-directory (findfile "export_dwf_main.lsp"))
-          "\\export_dwf_ui.dcl"))
       (strcat (edwf:g "folder") "\\export_dwf_ui.dcl")))
   (foreach c candidates
-    (if (and (null result) c (findfile c))
+    (if (and (null result) c (vl-file-exists-p c))
       (setq result c)))
   result)
 
