@@ -86,15 +86,15 @@ export_dwf_dialog : dialog {
     : row {
       : text       { label = "용지 크기:"; width = 10; }
       : popup_list { key = "cb_paper"; width = 30; }
-      : edit_box   { key = "ed_paper"; edit_width = 16; value = ""; }
+      : edit_box   { key = "ed_paper"; edit_width = 16; value = "자동"; }
     }
-    : text         { label = "  * 목록에서 선택하거나 우측 칸에 직접 입력 (예: USER)"; }
+    : text         { label = "  * 기본은 자동 맞춤 / 필요 시 정확한 용지명을 직접 입력"; }
     : row {
       : text       { label = "플롯 스타일:"; width = 10; }
       : popup_list { key = "cb_ctb"; width = 30; }
-      : edit_box   { key = "ed_ctb"; edit_width = 16; value = ""; }
+      : edit_box   { key = "ed_ctb"; edit_width = 16; value = "none"; }
     }
-    : text         { label = "  * 설치된 이름에서 선택하거나 직접 입력 (예: monochrome.ctb)"; }
+    : text         { label = "  * 기본은 none / 필요 시 정확한 스타일명을 직접 입력 (예: monochrome.ctb)"; }
   }
 
   // ── 미리보기 ──

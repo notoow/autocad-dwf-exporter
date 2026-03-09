@@ -10,7 +10,7 @@
 ;;;   - export_dwf_main.lsp  (이 파일)
 ;;;   - export_dwf_ui.dcl    (다이얼로그)
 ;;;
-;;; 사용법: APPLOAD → export_dwf_main.lsp → 명령: EXPORT-DWF
+;;; 사용법: APPLOAD → export_dwf_main.lsp → 명령: EXPORT-SHEETS
 ;;;
 ;;; 플롯 엔진 (버전 자동 선택):
 ;;;   R21+(2016~): ActiveX PlotToFile  → 실패 시 -PLOT 자동 폴백
@@ -24,9 +24,11 @@
 ;;; ============================================================
 
 (setq *edwf:cfg* nil)
+(setq *edwf:paper-cache* nil)
 
 (defun edwf:init (doc / fp)
   (setq fp (vla-get-fullname doc))
+  (setq *edwf:paper-cache* nil)
   (setq *edwf:cfg*
     (list
       (cons "mode"       "sample")
@@ -39,8 +41,8 @@
                            (vl-filename-directory fp)
                            "C:\\Temp"))
       (cons "prefix"     "도면")
-      (cons "paper"      "")
-      (cons "ctb"        "")
+      (cons "paper"      "AUTO")
+      (cons "ctb"        "none")
       (cons "crop-mode"  "border")
       (cons "minsize"    500)
       (cons "sample-lyr" nil)
@@ -52,6 +54,174 @@
   (if p
     (setq *edwf:cfg* (subst (cons k v) p *edwf:cfg*))
     (setq *edwf:cfg* (cons  (cons k v)   *edwf:cfg*))))
+
+(defun edwf:trim (s)
+  (vl-string-trim " " (if s s "")))
+
+(defun edwf:auto-paper-p (paper / s)
+  (setq s (strcase (edwf:trim paper)))
+  (or (= s "") (= s "AUTO") (= s "자동")))
+
+(defun edwf:none-ctb-p (ctb / s)
+  (setq s (strcase (edwf:trim ctb)))
+  (or (= s "") (= s "NONE") (= s "없음")))
+
+(defun edwf:paper-display (paper)
+  (if (edwf:auto-paper-p paper) "자동" paper))
+
+(defun edwf:ctb-display (ctb)
+  (if (edwf:none-ctb-p ctb) "none" ctb))
+
+(defun edwf:effective-ctb ()
+  (if (edwf:none-ctb-p (edwf:g "ctb")) "" (edwf:g "ctb")))
+
+(defun edwf:index-ci (item lst / idx found)
+  (setq item (strcase item)
+        idx  0)
+  (while (and lst (null found))
+    (if (= item (strcase (car lst)))
+      (setq found idx)
+      (setq idx (1+ idx)
+            lst (cdr lst))))
+  found)
+
+(defun edwf:last-string-search (pat str / pos next start)
+  (setq start 0)
+  (while (setq next (vl-string-search pat str start))
+    (setq pos   next
+          start (1+ next)))
+  pos)
+
+(defun edwf:extract-numbers (str / i ch token nums)
+  (setq i 1
+        token ""
+        nums nil)
+  (while (<= i (strlen str))
+    (setq ch (substr str i 1))
+    (if (wcmatch ch "[0-9.]")
+      (setq token (strcat token ch))
+      (if (/= token "")
+        (setq nums  (append nums (list token))
+              token "")))
+    (setq i (1+ i)))
+  (if (/= token "")
+    (setq nums (append nums (list token))))
+  nums)
+
+(defun edwf:insunits-mm-factor (/ u)
+  (setq u (getvar "INSUNITS"))
+  (cond
+    ((or (= u 0) (= u 4)) 1.0)
+    ((= u 1) 25.4)
+    ((= u 2) 304.8)
+    ((= u 5) 10.0)
+    ((= u 6) 1000.0)
+    ((= u 14) 100.0)
+    (T 1.0)))
+
+(defun edwf:window-size-mm (pt-min pt-max / factor)
+  (setq factor (edwf:insunits-mm-factor))
+  (list
+    (* factor (abs (- (car  pt-max) (car  pt-min))))
+    (* factor (abs (- (cadr pt-max) (cadr pt-min))))))
+
+(defun edwf:paper-dims-mm (paper / upper lp rp chunk nums scale)
+  (setq upper (strcase paper)
+        lp    (edwf:last-string-search "(" upper)
+        rp    (edwf:last-string-search ")" upper))
+  (setq chunk
+    (if (and lp rp (> rp lp))
+      (substr upper (+ lp 2) (- rp lp 1))
+      upper))
+  (setq nums (edwf:extract-numbers chunk)
+        scale
+          (cond
+            ((wcmatch chunk "*INCH*") 25.4)
+            ((wcmatch chunk "*CM*")   10.0)
+            ((wcmatch chunk "*MM*")    1.0)
+            (T                         1.0)))
+  (if (>= (length nums) 2)
+    (list
+      (* (atof (nth 0 nums)) scale)
+      (* (atof (nth 1 nums)) scale))))
+
+(defun edwf:paper-fit-score (paper-w paper-h target-w target-h / fit1 fit2)
+  (setq fit1
+    (if (and (>= paper-w target-w) (>= paper-h target-h))
+      (max (/ paper-w target-w) (/ paper-h target-h))))
+  (setq fit2
+    (if (and (>= paper-w target-h) (>= paper-h target-w))
+      (max (/ paper-w target-h) (/ paper-h target-w))))
+  (cond
+    ((and fit1 fit2) (min fit1 fit2))
+    (fit1 fit1)
+    (fit2 fit2)
+    (T nil)))
+
+(defun edwf:paper-distance-score (paper-w paper-h target-w target-h)
+  (min
+    (+ (abs (- paper-w target-w)) (abs (- paper-h target-h)))
+    (+ (abs (- paper-w target-h)) (abs (- paper-h target-w)))))
+
+(defun edwf:get-papers-cached (plotter layout / key hit papers)
+  (setq key (strcase plotter)
+        hit (assoc key *edwf:paper-cache*))
+  (if hit
+    (cdr hit)
+    (progn
+      (setq papers (edwf:get-papers plotter layout))
+      (setq *edwf:paper-cache* (cons (cons key papers) *edwf:paper-cache*))
+      papers)))
+
+(defun edwf:resolve-auto-paper (plotter layout pt-min pt-max
+                                 / size target-w target-h papers dims
+                                   paper-w paper-h fit-score dist-score
+                                   best-fit best-fit-name
+                                   best-fallback best-fallback-score)
+  (setq size     (edwf:window-size-mm pt-min pt-max)
+        target-w (car size)
+        target-h (cadr size)
+        papers   (edwf:get-papers-cached plotter layout))
+  (foreach paper papers
+    (setq dims (edwf:paper-dims-mm paper))
+    (if dims
+      (progn
+        (setq paper-w (car dims)
+              paper-h (cadr dims)
+              fit-score (edwf:paper-fit-score paper-w paper-h target-w target-h))
+        (if fit-score
+          (if (or (null best-fit) (< fit-score best-fit))
+            (setq best-fit      fit-score
+                  best-fit-name paper))
+          (progn
+            (setq dist-score (edwf:paper-distance-score paper-w paper-h target-w target-h))
+            (if (or (null best-fallback-score) (< dist-score best-fallback-score))
+              (setq best-fallback-score dist-score
+                    best-fallback       paper)))))))
+  (if best-fit-name best-fit-name best-fallback))
+
+(defun edwf:resolve-paper (plotter layout pt-min pt-max / paper)
+  (setq paper (edwf:trim (edwf:g "paper")))
+  (if (edwf:auto-paper-p paper)
+    (edwf:resolve-auto-paper plotter layout pt-min pt-max)
+    paper))
+
+(defun edwf:landscape-p (width height)
+  (> width height))
+
+(defun edwf:paper-rotation-for-window (paper pt-min pt-max / dims size)
+  (setq dims (if paper (edwf:paper-dims-mm paper))
+        size (edwf:window-size-mm pt-min pt-max))
+  (if (and dims
+           (/= (edwf:landscape-p (car dims) (cadr dims))
+               (edwf:landscape-p (car size) (cadr size))))
+    1
+    0))
+
+(defun edwf:paper-orientation-key (pt-min pt-max / width height)
+  (setq width  (abs (- (car  pt-max) (car  pt-min)))
+        height (abs (- (cadr pt-max) (cadr pt-min))))
+  (if (> width height) "_Landscape" "_Portrait"))
 
 ;;; ============================================================
 ;;; 섹션 2: AutoCAD 버전 감지
@@ -86,7 +256,7 @@
 ;;; 섹션 4: 메인 명령
 ;;; ============================================================
 
-(defun c:EXPORT-DWF ( / acad doc dcl-file dcl-id dlg-result)
+(defun edwf:main-command ( / acad doc dcl-file dcl-id dlg-result)
 
   (setq acad (vlax-get-acad-object))
   (setq doc  (vla-get-activedocument acad))
@@ -120,6 +290,12 @@
           ((= dlg-result 1) (edwf:run-export doc))
           (T                (princ "\n취소됨.")))))))
   (princ))
+
+(defun c:EXPORT-SHEETS ()
+  (edwf:main-command))
+
+(defun c:EXPORT-DWF ()
+  (edwf:main-command))
 
 ;;; ============================================================
 ;;; 섹션 5: DCL 파일 탐색
@@ -213,8 +389,8 @@
                            (itoa (edwf:g "aci")) ""))
   (set_tile "ed_folder"  (edwf:g "folder"))
   (set_tile "ed_prefix"  (edwf:g "prefix"))
-  (set_tile "ed_paper"   (edwf:g "paper"))
-  (set_tile "ed_ctb"     (edwf:g "ctb"))
+  (set_tile "ed_paper"   (edwf:paper-display (edwf:g "paper")))
+  (set_tile "ed_ctb"     (edwf:ctb-display (edwf:g "ctb")))
   (set_tile "ed_minsize" (itoa (edwf:g "minsize")))
   (set_tile "txt_count"  "감지된 개수: -")
   
@@ -234,12 +410,18 @@
   (setq acad   (vlax-get-acad-object)
         doc    (vla-get-activedocument acad)
         layout (vla-get-activelayout doc))
-  (setq *edwf:paper-list* (edwf:get-papers plotter layout))
+  (setq *edwf:paper-list* (edwf:get-papers-cached plotter layout))
   (start_list "cb_paper")
-  (add_list "- 직접 입력 -")
+  (add_list "- 자동 맞춤 (기본) -")
+  (add_list "- 용지명 직접 입력 -")
   (foreach p *edwf:paper-list* (add_list p))
   (end_list)
-  (set_tile "cb_paper" "0"))
+  (set_tile "cb_paper"
+    (cond
+      ((edwf:auto-paper-p (edwf:g "paper")) "0")
+      ((edwf:index-ci (edwf:g "paper") *edwf:paper-list*)
+       (itoa (+ 2 (edwf:index-ci (edwf:g "paper") *edwf:paper-list*))))
+      (T "1"))))
 
 (defun edwf:update-ctb-list ( / acad doc layout)
   (setq acad   (vlax-get-acad-object)
@@ -247,25 +429,38 @@
         layout (vla-get-activelayout doc))
   (setq *edwf:ctb-list* (edwf:get-ctbs layout))
   (start_list "cb_ctb")
-  (add_list "- 직접 입력 -")
-  (add_list "- 없음 -")
+  (add_list "- 없음 (기본) -")
+  (add_list "- 스타일명 직접 입력 -")
   (foreach c *edwf:ctb-list* (add_list c))
   (end_list)
-  (set_tile "cb_ctb" "0"))
+  (set_tile "cb_ctb"
+    (cond
+      ((edwf:none-ctb-p (edwf:g "ctb")) "0")
+      ((edwf:index-ci (edwf:g "ctb") *edwf:ctb-list*)
+       (itoa (+ 2 (edwf:index-ci (edwf:g "ctb") *edwf:ctb-list*))))
+      (T "1"))))
 
 (defun edwf:cb-paper-action (val / idx p)
   (setq idx (atoi val))
-  (if (> idx 0)
-    (progn
-      (setq p (nth (1- idx) *edwf:paper-list*))
-      (set_tile "ed_paper" p)
-      (edwf:s "paper" p))))
+  (cond
+    ((= idx 0)
+     (set_tile "ed_paper" "자동")
+     (edwf:s "paper" "AUTO"))
+    ((= idx 1)
+     (set_tile "ed_paper"
+       (if (edwf:auto-paper-p (edwf:g "paper")) "" (edwf:g "paper"))))
+    (T
+     (setq p (nth (- idx 2) *edwf:paper-list*))
+     (set_tile "ed_paper" p)
+     (edwf:s "paper" p))))
 
 (defun edwf:cb-ctb-action (val / idx c)
   (setq idx (atoi val))
   (cond
-    ((= idx 0) nil)
-    ((= idx 1) (set_tile "ed_ctb" "") (edwf:s "ctb" ""))
+    ((= idx 0) (set_tile "ed_ctb" "none") (edwf:s "ctb" "none"))
+    ((= idx 1)
+     (set_tile "ed_ctb"
+       (if (edwf:none-ctb-p (edwf:g "ctb")) "none" (edwf:g "ctb"))))
     (T
       (setq c (nth (- idx 2) *edwf:ctb-list*))
       (set_tile "ed_ctb" c)
@@ -285,13 +480,13 @@
     (strcat "(edwf:s \"format\" \"DWF\")"
             "(edwf:s \"plotter\" \"DWF6 ePlot.pc3\")"
             "(edwf:s \"ext\" \".dwf\")"
-            "(edwf:s \"paper\" \"\")(set_tile \"ed_paper\" \"\")"
+            "(edwf:s \"paper\" \"AUTO\")(set_tile \"ed_paper\" \"자동\")"
             "(edwf:update-paper-list \"DWF6 ePlot.pc3\")"))
   (action_tile "rb_pdf"
     (strcat "(edwf:s \"format\" \"PDF\")"
             "(edwf:s \"plotter\" \"DWG To PDF.pc3\")"
             "(edwf:s \"ext\" \".pdf\")"
-            "(edwf:s \"paper\" \"\")(set_tile \"ed_paper\" \"\")"
+            "(edwf:s \"paper\" \"AUTO\")(set_tile \"ed_paper\" \"자동\")"
             "(edwf:update-paper-list \"DWG To PDF.pc3\")"))
 
   (action_tile "btn_browse"  "(edwf:browse-folder)")
@@ -317,8 +512,10 @@
   (edwf:s "layer"  (get_tile "ed_layer"))
   (edwf:s "folder" (get_tile "ed_folder"))
   (edwf:s "prefix" (get_tile "ed_prefix"))
-  (edwf:s "paper"  (get_tile "ed_paper"))
-  (edwf:s "ctb"    (get_tile "ed_ctb"))
+  (edwf:s "paper"
+    (if (edwf:auto-paper-p (get_tile "ed_paper")) "AUTO" (edwf:trim (get_tile "ed_paper"))))
+  (edwf:s "ctb"
+    (if (edwf:none-ctb-p (get_tile "ed_ctb")) "none" (edwf:trim (get_tile "ed_ctb"))))
   (edwf:s "crop-mode"
     (if (= (get_tile "cb_crop_mode") "1") "content" "border"))
   (setq tmp-min (atoi (get_tile "ed_minsize")))
@@ -623,27 +820,32 @@
 (defun edwf:plot-one (pt-min pt-max filepath plotter doc layout)
   (if (>= (edwf:acad-ver) 21)
     (edwf:plot-activex pt-min pt-max filepath plotter doc layout)
-    (edwf:plot-command pt-min pt-max filepath plotter)))
+    (edwf:plot-command pt-min pt-max filepath plotter layout)))
 
 ;;; ── 방법 A: ActiveX (R21+) ─────────────────────────────────
 ;;; ActiveX core attempt. The caller restores state and decides fallback.
 (defun edwf:plot-activex-core (pt-min pt-max filepath plotter
                                 doc layout
-                                / plot-obj win-min win-max applied)
+                                / plot-obj win-min win-max applied
+                                  paper-name rotation ctb-name)
+  (setq paper-name (edwf:resolve-paper plotter layout pt-min pt-max)
+        rotation   (edwf:paper-rotation-for-window paper-name pt-min pt-max)
+        ctb-name   (edwf:effective-ctb))
   (vla-put-ConfigName layout plotter)
   (vla-RefreshPlotDeviceInfo layout)
-  (if (and (edwf:g "paper") (/= (edwf:g "paper") ""))
+  (if paper-name
     (progn
-      (vla-put-CanonicalMediaName layout (edwf:g "paper"))
+      (vla-put-CanonicalMediaName layout paper-name)
       (setq applied (vla-get-CanonicalMediaName layout))
-      (if (not (wcmatch (strcase applied) (strcase (edwf:g "paper"))))
-        (princ (strcat "\n    [경고] 용지 '" (edwf:g "paper") "' 등록 안됨 → 기본 용지로 출력됨")))))
-  (if (and (edwf:g "ctb") (/= (edwf:g "ctb") ""))
-    (vla-put-StyleSheet layout (edwf:g "ctb")))
+      (if (not (wcmatch (strcase applied) (strcase paper-name)))
+        (princ (strcat "\n    [경고] 용지 '" paper-name "' 등록 안됨 → 기본 용지로 출력됨")))))
+  (if (/= ctb-name "")
+    (vla-put-StyleSheet layout ctb-name)
+    (vl-catch-all-apply 'vla-put-StyleSheet (list layout "")))
   (vla-put-PlotType layout 4)
   (vla-put-UseStandardScale layout :vlax-true)
   (vla-put-StandardScale layout 0)
-  (vla-put-PlotRotation layout 0)
+  (vla-put-PlotRotation layout rotation)
   (vla-put-CenterPlot layout :vlax-true)
 
   (setq win-min (vlax-make-safearray vlax-vbDouble '(0 . 1))
@@ -701,10 +903,10 @@
          (princ (strcat "\n    ActiveX 오류: "
                   result-msg
                   " → -PLOT 폴백"))
-         (edwf:plot-command pt-min pt-max filepath plotter))
+         (edwf:plot-command pt-min pt-max filepath plotter layout))
        nil))
     ((eq result 'fallback)
-     (edwf:plot-command pt-min pt-max filepath plotter))
+     (edwf:plot-command pt-min pt-max filepath plotter layout))
     ((findfile filepath)
      (princ " OK") T)
     (T
@@ -732,9 +934,10 @@
 ;;; Model 탭 + 가상 플로터 기준 프롬프트 순서.
 ;;; "Scale lineweights" 프롬프트가 없는 AutoCAD 버전에서는
 ;;; 이후 응답이 밀릴 수 있음 (FAIL 메시지로 안내).
-(defun edwf:plot-command (pt-min pt-max filepath plotter
+(defun edwf:plot-command (pt-min pt-max filepath plotter layout
                            / old-ce old-bg old-fd old-err
-                             x1s y1s x2s y2s plot-ok)
+                             x1s y1s x2s y2s plot-ok
+                             paper-name orient-key ctb-name use-ctb)
   (setq old-err *error* plot-ok T)
   (defun *error* (msg)
     (setq plot-ok nil)
@@ -757,31 +960,58 @@
   (setq x1s (rtos (car  pt-min) 2 4)
         y1s (rtos (cadr pt-min) 2 4)
         x2s (rtos (car  pt-max) 2 4)
-        y2s (rtos (cadr pt-max) 2 4))
+        y2s (rtos (cadr pt-max) 2 4)
+        paper-name (edwf:resolve-paper plotter layout pt-min pt-max)
+        orient-key (edwf:paper-orientation-key pt-min pt-max)
+        ctb-name   (edwf:effective-ctb)
+        use-ctb    (/= ctb-name ""))
 
-  (command
-    "_.-PLOT"
-    "_Yes"                          ; 상세 설정
-    ""                              ; 현재 레이아웃
-    plotter                         ; 플로터
-    (if (and (edwf:g "paper") (/= (edwf:g "paper") "")) (edwf:g "paper") "") ; 용지
-    ""                              ; 단위 (현재 유지)
-    ""                              ; 방향 (현재 유지)
-    "_No"                           ; 뒤집기
-    "_Window"                       ; 영역
-    (strcat x1s "," y1s)            ; 좌하단
-    (strcat x2s "," y2s)            ; 우상단
-    "_Fit"                          ; 스케일
-    "0,0"                           ; 오프셋
-    "_Yes"                          ; 플롯 스타일
-    (if (and (edwf:g "ctb") (/= (edwf:g "ctb") "")) (edwf:g "ctb") "") ; CTB
-    "_Yes"                          ; 선가중치
-    "_No"                           ; 선가중치 스케일링
-    "_Yes"                          ; 파일에 플롯 (가상 플로터 필수)
-    filepath                        ; 파일 경로
-    "_No"                           ; 설정 저장 안 함
-    "_Yes"                          ; 진행
-  )
+  (if use-ctb
+    (command
+      "_.-PLOT"
+      "_Yes"                          ; 상세 설정
+      ""                              ; 현재 레이아웃
+      plotter                         ; 플로터
+      (if paper-name paper-name "")   ; 용지
+      ""                              ; 단위 (현재 유지)
+      orient-key                      ; 방향
+      "_No"                           ; 뒤집기
+      "_Window"                       ; 영역
+      (strcat x1s "," y1s)            ; 좌하단
+      (strcat x2s "," y2s)            ; 우상단
+      "_Fit"                          ; 스케일
+      "0,0"                           ; 오프셋
+      "_Yes"                          ; 플롯 스타일
+      ctb-name                        ; CTB
+      "_Yes"                          ; 선가중치
+      "_No"                           ; 선가중치 스케일링
+      "_Yes"                          ; 파일에 플롯 (가상 플로터 필수)
+      filepath                        ; 파일 경로
+      "_No"                           ; 설정 저장 안 함
+      "_Yes"                          ; 진행
+    )
+    (command
+      "_.-PLOT"
+      "_Yes"                          ; 상세 설정
+      ""                              ; 현재 레이아웃
+      plotter                         ; 플로터
+      (if paper-name paper-name "")   ; 용지
+      ""                              ; 단위 (현재 유지)
+      orient-key                      ; 방향
+      "_No"                           ; 뒤집기
+      "_Window"                       ; 영역
+      (strcat x1s "," y1s)            ; 좌하단
+      (strcat x2s "," y2s)            ; 우상단
+      "_Fit"                          ; 스케일
+      "0,0"                           ; 오프셋
+      "_No"                           ; 플롯 스타일 없음
+      "_Yes"                          ; 선가중치
+      "_No"                           ; 선가중치 스케일링
+      "_Yes"                          ; 파일에 플롯 (가상 플로터 필수)
+      filepath                        ; 파일 경로
+      "_No"                           ; 설정 저장 안 함
+      "_Yes"                          ; 진행
+    ))
 
   (setvar "CMDECHO"        old-ce)
   (setvar "BACKGROUNDPLOT" old-bg)
@@ -895,6 +1125,6 @@
   (if (>= (edwf:acad-ver) 21)
     "ActiveX (실패 시 -PLOT 자동 폴백)"
     "-PLOT 명령")))
-(princ "\n  명령: EXPORT-DWF")
+(princ "\n  명령: EXPORT-SHEETS  (호환: EXPORT-DWF)")
 (princ "\n================================================")
 (princ)
