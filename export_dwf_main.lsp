@@ -111,7 +111,7 @@
         (princ "\n  DCL 로드 실패 → 텍스트 모드")
         (edwf:textmode doc))
        (T
-        (setq dlg-result (edwf:run-dialog dcl-id doc))
+        (setq dlg-result (edwf:run-dialog dcl-id))
         (unload_dialog dcl-id)
         (cond
           ((= dlg-result 1) (edwf:run-export doc))
@@ -141,7 +141,7 @@
 ;;; 섹션 6: 다이얼로그
 ;;; ============================================================
 
-(defun edwf:run-dialog (dcl-id doc / dlg-result)
+(defun edwf:run-dialog (dcl-id / dlg-result)
   (if (not (new_dialog "export_dwf_dialog" dcl-id))
     (progn (princ "\n다이얼로그 생성 실패.") 0)
     (progn
