@@ -1,209 +1,174 @@
-# AutoCAD DWF/PDF Exporter
+# AutoCAD Sheet Exporter
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![AutoCAD](https://img.shields.io/badge/AutoCAD-2015~2025-red.svg)](https://www.autodesk.com/products/autocad)
 [![AutoLISP](https://img.shields.io/badge/AutoLISP-Visual%20LISP-green.svg)](#)
 
-[한국어](#한국어) | [English](#english)
+[한국어](#ko) | [English](#english)
 
 ---
 
-<a name="한국어"></a>
-# 한국어
+<a id="ko"></a>
+## 한국어
 
-AutoCAD 도면에서 블록참조(INSERT) 및 폴리라인(LWPOLYLINE) 테두리를 자동 감지하여 각각을 개별 DWF 또는 PDF 파일로 일괄 내보내는 AutoLISP 스크립트입니다.
+모델 공간의 테두리 객체를 감지해서 각 시트를 개별 `DWF` 또는 `PDF`로 내보내는 AutoLISP 스크립트입니다.
+`INSERT` 블록 참조와 닫힌 `LWPOLYLINE` 테두리를 지원하며, 필요하면 `PDF + DWF`를 한 번에 둘 다 생성할 수 있습니다.
 
-## 주요 기능
+### 주요 기능
 
-- **DWF / PDF 출력 형식 선택** (DWF6 ePlot / DWG To PDF)
-- **INSERT(블록참조) + LWPOLYLINE(폴리라인) 동시 감지**, 중복 자동 제거
-- **샘플 클릭**: 테두리 하나를 클릭하면 레이어/색상 자동 추출
-- **ACI 색상 필터**: 특정 색상 객체만 선별 감지
-- **DCL 다이얼로그 UI** (폴더 찾기, 미리보기, 필터 설정)
-- DCL 없이도 **텍스트 모드**로 실행 가능
-- 위→아래, 좌→우 **자동 정렬** (평균 높이 기반 행 구분)
+- `EXPORT-SHEETS` 기본 명령, `EXPORT-DWF` 호환 별칭 유지
+- `INSERT` + 닫힌 `LWPOLYLINE` 동시 감지
+- 샘플 테두리 1개를 클릭하면 레이어/ACI를 자동 추출
+- 샘플 선택 직후 같은 조건의 감지 개수를 자동 계산해서 미리보기 표시
+- 출력 형식:
+  - `DWF`
+  - `PDF`
+  - `PDF + DWF`
+- 출력 범위:
+  - `테두리 기준`
+  - `내부 내용 기준 크롭`
+- 용지 기본값은 `자동 맞춤`
+- 특수 상황에서는 플로터에 등록된 `사용자정의/커스텀 용지명`을 정확히 직접 지정 가능
+- CTB 기본값은 `none`, 필요 시 정확한 스타일명 직접 지정 가능
+- AutoCAD 2016 이상은 `ActiveX PlotToFile`, 실패 시 자동으로 `-PLOT` 폴백
+- AutoCAD 2015는 `-PLOT` 명령 경로 사용
 
-## 플롯 엔진
+### 배포 시 필요한 파일
 
-버전에 따라 자동으로 최적의 방식을 선택합니다.
+실사용 기준으로는 아래 2개만 있으면 됩니다.
 
-| AutoCAD 버전 | 방식 | 비고 |
-|-------------|------|------|
-| R21+ (2016~2025) | ActiveX PlotToFile | `vlax-get-property doc 'Plot` 사용, 레이아웃 설정 백업/복원 |
-| R20 이하 (2015) | `_.-PLOT` 명령 | 영문 키워드 강제로 한/영 모두 동작 |
-| ActiveX 실패 시 | `_.-PLOT` 자동 폴백 | Plot 객체 취득 실패 또는 PlotToFile 오류 시 |
+- `export_dwf_main.lsp`
+- `export_dwf_ui.dcl`
 
-**안전장치:**
-- `*error*` 핸들러로 오류 시에도 레이아웃 설정 + 시스템 변수 복원 보장
-- CMDECHO, BACKGROUNDPLOT, FILEDIA 자동 보존/복원
-- 출력 파일 존재 여부 검증 + 성공/실패 카운트
+대상 `.dwg` 파일과 같은 폴더에 두는 것을 권장합니다.
 
-## 빠른 시작
+`encode_euckr.py`, `.vscode/settings.json`, `README.md`는 개발/관리용입니다.
 
-1. 저장소 클론:
-   ```bash
-   git clone https://github.com/notoow/autocad-dwf-exporter.git
-   ```
+### 빠른 시작
 
-2. AutoCAD에서:
-   ```
-   APPLOAD → export_dwf_main.lsp 로드
-   EXPORT-DWF 명령 실행
-   ```
+1. `export_dwf_main.lsp` 와 `export_dwf_ui.dcl` 을 대상 `.dwg` 와 같은 폴더에 둡니다.
+2. AutoCAD에서 `APPLOAD` 실행
+3. `export_dwf_main.lsp` 로드
+4. 명령행에 `EXPORT-SHEETS` 입력
 
-**실행 흐름:**
-```
-EXPORT-DWF
- → 감지 방식 (샘플 클릭 / 레이어 입력)
- → 출력 형식 (DWF / PDF)
- → 저장 폴더 지정
- → 미리보기 (선택)
- → 내보내기 시작
-```
+호환용으로 `EXPORT-DWF`도 계속 동작합니다.
 
-## 인코딩 작업 흐름
+### 기본 동작
 
-이 프로젝트는 한국어 AutoCAD 호환성을 위해 배포용 `.lsp`, `.dcl` 파일을
-**CP949 (ANSI/EUC-KR)** 기준으로 관리합니다.
+- 용지를 비워두거나 `자동` 상태로 두면 각 테두리 크기에 가장 가까운 용지를 자동 선택합니다.
+- `PDF + DWF`를 고르면 시트마다 `도면1.dwf`, `도면1.pdf` 식으로 둘 다 생성합니다.
+- `플롯 스타일`을 비워두거나 기본 상태로 두면 `none` 으로 처리합니다.
+- `특수/사용자정의 용지명`은 표준 용지가 아닌, 플로터에 등록된 특정 용지명을 강제로 써야 할 때 사용합니다.
 
-- VS Code에서는 포함된 `.vscode/settings.json` 설정을 사용합니다
-- 한글이 깨져 보이면 `Korean (Windows 949)`로 다시 엽니다
-- UTF-8로 먼저 수정했다면 AutoCAD에 넣기 전에 변환합니다
+### DCL 없이도 사용 가능
+
+`export_dwf_ui.dcl` 을 찾지 못하면 텍스트 모드로 자동 전환됩니다.
+텍스트 모드에서도 감지 방식, 출력 형식, 크롭 모드, 저장 폴더를 입력해서 실행할 수 있습니다.
+
+### 인코딩 작업 흐름
+
+배포용 `.lsp`, `.dcl` 파일은 AutoCAD 호환성을 위해 `CP949` 기준으로 관리합니다.
+반면 `README.md` 는 일반적인 GitHub 표시를 위해 `UTF-8` 입니다.
+
+UTF-8로 수정한 뒤 배포용으로 다시 변환하려면:
 
 ```bash
 python encode_euckr.py export_dwf_main.lsp
 python encode_euckr.py export_dwf_ui.dcl
 ```
 
-- 같은 파일에 덮어쓸 때는 `.utf8.bak` 백업이 자동 생성됩니다
+덮어쓰기 변환 시 `.utf8.bak` 백업이 자동 생성됩니다.
 
-## 파일 구조
+### 요구 사항
 
-```
-autocad-dwf-exporter/
-├── README.md
-├── .gitignore
-├── encode_euckr.py         # UTF-8 -> CP949 변환 도우미
-├── export_dwf_main.lsp     # 메인 스크립트 (EXPORT-DWF 명령)
-├── export_dwf_ui.dcl       # DCL 다이얼로그 정의
-└── .vscode/settings.json   # VS Code 인코딩/줄바꿈 권장 설정
-```
+- AutoCAD 2015 ~ 2025
+- `DWF6 ePlot.pc3` 또는 `DWG To PDF.pc3`
+- UI 사용 시 `export_dwf_ui.dcl` 이 DWG와 같은 폴더에 있거나 AutoCAD 검색 경로에 포함되어 있어야 함
 
-## 전제조건
+### 최근 반영 사항
 
-- AutoCAD 2015 이상
-- `DWF6 ePlot.pc3` 또는 `DWG To PDF.pc3` 드라이버 설치
-- UI 다이얼로그 사용 시, `export_dwf_ui.dcl` 파일을 **현재 작업 중인 도면(.dwg) 파일과 같은 폴더**에 배치하거나 AutoCAD 지원 파일 검색 경로에 추가해야 정상 동작합니다.
-
-## 변경 이력
-
-- **v5** — ActiveX 조기반환 버그 수정 (fallback-p), *error* 핸들러 순서 수정, -PLOT 프롬프트 정밀화, 한글 인코딩(ANSI) 수정
-- **v4** — 단일 파일 통합, 버전별 플롯 엔진 자동 선택 (ActiveX + -PLOT 폴백), 레이아웃 설정 백업/복원
-- **v3** — `_.-PLOT` 명령 전면 도입
-- **v2** — 플롯 API 수정, 레이어 선택 추가
-- **v1** — 초기 버전
+- 자동 용지 맞춤 기본값 적용
+- `EXPORT-SHEETS` 명령 추가
+- 샘플 선택 후 감지 개수 자동 미리보기
+- model space 기준 감지 강화
+- `PDF + DWF` 동시 출력 추가
+- 특수/사용자정의 용지명 직접 지정 안내 개선
 
 ---
 
-<br><br>
+<a id="english"></a>
+## English
 
-<a name="english"></a>
-# English
+AutoLISP utility for detecting sheet borders in model space and exporting each sheet as an individual `DWF` or `PDF` file.
+It supports both `INSERT` block references and closed `LWPOLYLINE` borders, and can optionally export both `PDF + DWF` in one batch run.
 
-An AutoLISP script that automatically detects block references (INSERT) and polyline borders in AutoCAD drawings and batch exports each region into individual DWF or PDF files.
+### Features
 
-## Key Features
+- Primary command: `EXPORT-SHEETS`
+- Backward-compatible alias: `EXPORT-DWF`
+- Detects both `INSERT` and closed `LWPOLYLINE` borders
+- Sample-pick mode automatically captures layer and ACI color
+- Automatically previews matching border count after sample selection
+- Output modes:
+  - `DWF`
+  - `PDF`
+  - `PDF + DWF`
+- Crop modes:
+  - `Border`
+  - `Content`
+- Default paper mode is `Auto Fit`
+- Exact custom paper names can be entered for special plotter-specific cases
+- Default CTB is `none`
+- AutoCAD 2016+ uses ActiveX with automatic `-PLOT` fallback
+- AutoCAD 2015 uses `-PLOT`
 
-- **Select Output Format**: DWF (DWF6 ePlot) or PDF (DWG To PDF)
-- **Dual Detection**: Detects both INSERT (Block References) and LWPOLYLINE simultaneously, automatically removing duplicates.
-- **Sample Pick Mode**: Click a single border to automatically extract its layer and color properties.
-- **ACI Color Filter**: Isolate detection to specific color entities.
-- **Graphical UI (DCL)**: User-friendly dialog for folder browsing, preview counts, and filter adjustments.
-- **Text Mode Fallback**: Can execute via command-line prompts if the DCL file is missing.
-- **Smart Sorting**: Automatically sorts borders Top-to-Bottom, Left-to-Right based on average row height.
+### Files Required For Deployment
 
-## Plot Engine
+Only these two files are required for normal use:
 
-The script automatically selects the optimal plotting method based on the AutoCAD version.
+- `export_dwf_main.lsp`
+- `export_dwf_ui.dcl`
 
-| AutoCAD Version | Engine | Notes |
-|-----------------|--------|-------|
-| R21+ (2016~2025)| ActiveX PlotToFile | Uses `vlax-get-property doc 'Plot`, backs up/restores layout setups. |
-| R20 & Below (2015)| `_.-PLOT` Command | Uses enforced English keywords to work on localized AutoCAD versions. |
-| Fallback | `_.-PLOT` Fallback | Automatically falls back to the command line method if ActiveX fails. |
+Place them in the same folder as the target `.dwg` whenever possible.
 
-**Safeguards:**
-- Robust `*error*` handler guarantees restoration of layout properties and system variables on failure.
-- Auto preserves/restores CMDECHO, BACKGROUNDPLOT, and FILEDIA.
-- Verifies output file existence + tracks success/failure counts.
+### Quick Start
 
-## Quick Start
+1. Put `export_dwf_main.lsp` and `export_dwf_ui.dcl` next to your target drawing.
+2. Run `APPLOAD` in AutoCAD.
+3. Load `export_dwf_main.lsp`.
+4. Run `EXPORT-SHEETS`.
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/notoow/autocad-dwf-exporter.git
-   ```
+`EXPORT-DWF` is still available as a compatibility alias.
 
-2. Inside AutoCAD:
-   ```
-   Run APPLOAD → load export_dwf_main.lsp
-   Type EXPORT-DWF in the command line
-   ```
+### Plot Behavior
 
-**Execution Flow:**
-```
-EXPORT-DWF
- → Select detection method (Sample Pick / Layer Input)
- → Select format (DWF / PDF)
- → Select output folder
- → Preview (Optional)
- → Start Batch Export
-```
+- If paper is left at `Auto`, the script selects the closest available paper for each detected border.
+- If `PDF + DWF` is selected, each sheet is exported twice, for example `Sheet1.dwf` and `Sheet1.pdf`.
+- If plot style is left empty/default, it behaves as `none`.
+- Manual paper input is intended for exact custom paper names already registered in the target plotter.
 
-## File Structure
+### Encoding Workflow
 
-```
-autocad-dwf-exporter/
-├── README.md
-├── .gitignore
-├── encode_euckr.py         # UTF-8 -> CP949 conversion helper
-├── export_dwf_main.lsp     # Core script (EXPORT-DWF command)
-├── export_dwf_ui.dcl       # UI dialog definition
-└── .vscode/settings.json   # Recommended VS Code encoding settings
-```
+Distributable `.lsp` and `.dcl` files are kept in `CP949` for Korean AutoCAD compatibility.
+This `README.md` stays in `UTF-8` for GitHub readability.
 
-## Encoding Workflow
-
-This project targets Korean AutoCAD environments, so the distributable `.lsp` and
-`.dcl` files are kept in **CP949 (ANSI/EUC-KR)** for compatibility.
-
-- Use the included `.vscode/settings.json` for VS Code
-- If text looks garbled, reopen the file with `Korean (Windows 949)`
-- If you edit in UTF-8 first, convert before loading in AutoCAD
+To convert edited source files back to CP949:
 
 ```bash
 python encode_euckr.py export_dwf_main.lsp
 python encode_euckr.py export_dwf_ui.dcl
 ```
 
-- Overwrite conversion creates a `.utf8.bak` backup automatically
+Overwrite conversion automatically creates `.utf8.bak` backups.
 
-## Prerequisites
+### Requirements
 
-- AutoCAD 2015 or newer
-- `DWF6 ePlot.pc3` or `DWG To PDF.pc3` drivers must be installed
-- For the UI to work, place the `export_dwf_ui.dcl` file **in the same folder as your target drawing (.dwg) file** or add it to the AutoCAD Support File Search Path.
-
-## Changelog
-
-- **v5** — Fixed ActiveX fallback bug, reordered *error* handler, refined -PLOT prompts, fixed ANSI encoding for Korean UI.
-- **v4** — Unified into a single file, multi-engine plot support (ActiveX + -PLOT fallback), layout state preserving.
-- **v3** — Complete rewrite using raw `_.-PLOT` command.
-- **v2** — Plot API fixes, dynamic layer selection added.
-- **v1** — Initial release.
+- AutoCAD 2015 ~ 2025
+- `DWF6 ePlot.pc3` or `DWG To PDF.pc3`
+- For UI mode, `export_dwf_ui.dcl` must be in the same folder as the drawing or in the AutoCAD support search path
 
 ---
+
 ## License
-MIT License
 
-**Keywords:** AutoCAD, DWF, PDF, batch export, AutoLISP, Visual LISP, batch plot, AutoCAD script, AutoCAD automation, CAD batch print, DWF converter, 일괄 내보내기, 도면 출력, 자동화, CAD 자동화, 도면 자동 출력
+MIT License
