@@ -39,6 +39,8 @@
                            (vl-filename-directory fp)
                            "C:\\Temp"))
       (cons "prefix"     "도면")
+      (cons "paper"      "")
+      (cons "ctb"        "")
       (cons "minsize"    500)
       (cons "sample-lyr" nil)
       (cons "sample-aci" nil))))
@@ -174,6 +176,8 @@
                            (itoa (edwf:g "aci")) ""))
   (set_tile "ed_folder"  (edwf:g "folder"))
   (set_tile "ed_prefix"  (edwf:g "prefix"))
+  (set_tile "ed_paper"   (edwf:g "paper"))
+  (set_tile "ed_ctb"     (edwf:g "ctb"))
   (set_tile "ed_minsize" (itoa (edwf:g "minsize")))
   (set_tile "txt_count"  "감지된 개수: -"))
 
@@ -199,6 +203,8 @@
     "(edwf:s \"aci\" (if (= $value \"\") 0 (atoi $value)))")
   (action_tile "ed_folder"  "(edwf:s \"folder\"  $value)")
   (action_tile "ed_prefix"  "(edwf:s \"prefix\"  $value)")
+  (action_tile "ed_paper"   "(edwf:s \"paper\"   $value)")
+  (action_tile "ed_ctb"     "(edwf:s \"ctb\"     $value)")
   (action_tile "ed_minsize"
     "(edwf:s \"minsize\" (if (= $value \"\") 500 (atoi $value)))")
 
@@ -209,6 +215,8 @@
   (edwf:s "layer"  (get_tile "ed_layer"))
   (edwf:s "folder" (get_tile "ed_folder"))
   (edwf:s "prefix" (get_tile "ed_prefix"))
+  (edwf:s "paper"  (get_tile "ed_paper"))
+  (edwf:s "ctb"    (get_tile "ed_ctb"))
   (setq tmp-min (atoi (get_tile "ed_minsize")))
   (edwf:s "minsize" (if (> tmp-min 0) tmp-min 500))
   (setq tmp-aci (get_tile "ed_aci"))
@@ -362,7 +370,7 @@
 (defun edwf:plot-activex (pt-min pt-max filepath plotter
                            doc layout
                            / plot-obj win-min win-max
-                             old-cfg old-ptype old-ustd
+                             old-cfg old-paper-name old-ctb-name old-ptype old-ustd
                              old-scale old-rot old-center
                              old-bgplot old-err
                              result fallback-p)
@@ -373,6 +381,8 @@
 
   ;; 레이아웃 백업 (error 등록 전에 완료)
   (setq old-cfg    (vl-catch-all-apply 'vla-get-ConfigName       (list layout))
+        old-paper-name (vl-catch-all-apply 'vla-get-CanonicalMediaName (list layout))
+        old-ctb-name   (vl-catch-all-apply 'vla-get-StyleSheet       (list layout))
         old-ptype  (vl-catch-all-apply 'vla-get-PlotType         (list layout))
         old-ustd   (vl-catch-all-apply 'vla-get-UseStandardScale (list layout))
         old-scale  (vl-catch-all-apply 'vla-get-StandardScale    (list layout))
@@ -383,7 +393,7 @@
   (setq old-err *error*)
   (defun *error* (msg)
     (edwf:restore-layout layout
-      old-cfg old-ptype old-ustd old-scale old-rot old-center)
+      old-cfg old-paper-name old-ctb-name old-ptype old-ustd old-scale old-rot old-center)
     (setvar "BACKGROUNDPLOT" old-bgplot)
     (setq *error* old-err)
     (if (not (wcmatch (strcase msg) "*CANCEL*,*QUIT*,*EXIT*"))
@@ -391,6 +401,10 @@
 
   ;; 플롯 설정 적용
   (vl-catch-all-apply 'vla-put-ConfigName       (list layout plotter))
+  (if (and (edwf:g "paper") (/= (edwf:g "paper") ""))
+    (vl-catch-all-apply 'vla-put-CanonicalMediaName (list layout (edwf:g "paper"))))
+  (if (and (edwf:g "ctb") (/= (edwf:g "ctb") ""))
+    (vl-catch-all-apply 'vla-put-StyleSheet     (list layout (edwf:g "ctb"))))
   (vl-catch-all-apply 'vla-put-PlotType         (list layout 4))
   (vl-catch-all-apply 'vla-put-UseStandardScale (list layout :vlax-true))
   (vl-catch-all-apply 'vla-put-StandardScale    (list layout 0))
@@ -427,7 +441,7 @@
 
   ;; 복원
   (edwf:restore-layout layout
-    old-cfg old-ptype old-ustd old-scale old-rot old-center)
+    old-cfg old-paper-name old-ctb-name old-ptype old-ustd old-scale old-rot old-center)
   (setvar "BACKGROUNDPLOT" old-bgplot)
   (setq *error* old-err)
 
@@ -441,9 +455,13 @@
      (princ " FAIL") nil)))
 
 ;;; ── 레이아웃 복원 헬퍼 ──────────────────────────────────────
-(defun edwf:restore-layout (layout cfg ptype ustd scale rot center)
+(defun edwf:restore-layout (layout cfg paper ctb ptype ustd scale rot center)
   (if (and cfg    (not (vl-catch-all-error-p cfg)))
     (vl-catch-all-apply 'vla-put-ConfigName       (list layout cfg)))
+  (if (and paper  (not (vl-catch-all-error-p paper)))
+    (vl-catch-all-apply 'vla-put-CanonicalMediaName (list layout paper)))
+  (if (and ctb    (not (vl-catch-all-error-p ctb)))
+    (vl-catch-all-apply 'vla-put-StyleSheet       (list layout ctb)))
   (if (and ptype  (not (vl-catch-all-error-p ptype)))
     (vl-catch-all-apply 'vla-put-PlotType         (list layout ptype)))
   (if (and ustd   (not (vl-catch-all-error-p ustd)))
@@ -491,7 +509,7 @@
     "_Yes"                          ; 상세 설정
     ""                              ; 현재 레이아웃
     plotter                         ; 플로터
-    ""                              ; 용지 (현재 유지)
+    (if (and (edwf:g "paper") (/= (edwf:g "paper") "")) (edwf:g "paper") "") ; 용지
     ""                              ; 단위 (현재 유지)
     ""                              ; 방향 (현재 유지)
     "_No"                           ; 뒤집기
@@ -501,7 +519,7 @@
     "_Fit"                          ; 스케일
     "0,0"                           ; 오프셋
     "_Yes"                          ; 플롯 스타일
-    ""                              ; CTB (현재 유지)
+    (if (and (edwf:g "ctb") (/= (edwf:g "ctb") "")) (edwf:g "ctb") "") ; CTB
     "_Yes"                          ; 선가중치
     "_No"                           ; 선가중치 스케일링
     "_Yes"                          ; 파일에 플롯 (가상 플로터 필수)

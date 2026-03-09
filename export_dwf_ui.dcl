@@ -72,6 +72,21 @@ export_dwf_dialog : dialog {
     }
   }
 
+  // ── 플롯 옵션 ──
+  : boxed_column {
+    label = "플롯 옵션";
+    : row {
+      : text     { label = "용지 크기:"; width = 10; }
+      : edit_box { key = "ed_paper"; edit_width = 36; value = ""; }
+    }
+    : text       { label = "  * 여백 없이 뽑으려면 사용자 정의 용지 입력 (예: USER)"; }
+    : row {
+      : text     { label = "플롯 스타일:"; width = 10; }
+      : edit_box { key = "ed_ctb"; edit_width = 36; value = ""; }
+    }
+    : text       { label = "  * 흑백 출력 등 (예: monochrome.ctb) / 빈칸 시 기본값"; }
+  }
+
   // ── 미리보기 ──
   : boxed_column {
     label = "미리보기";
