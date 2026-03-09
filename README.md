@@ -75,7 +75,7 @@ autocad-dwf-exporter/
 
 - AutoCAD 2015 이상
 - `DWF6 ePlot.pc3` 또는 `DWG To PDF.pc3` 드라이버 설치
-- UI 사용 시 `export_dwf_ui.dcl`을 LSP와 같은 폴더에 배치
+- UI 다이얼로그 사용 시, `export_dwf_ui.dcl` 파일을 **현재 작업 중인 도면(.dwg) 파일과 같은 폴더**에 배치하거나 AutoCAD 지원 파일 검색 경로에 추가해야 정상 동작합니다.
 
 ## 변경 이력
 
@@ -156,7 +156,7 @@ autocad-dwf-exporter/
 
 - AutoCAD 2015 or newer
 - `DWF6 ePlot.pc3` or `DWG To PDF.pc3` drivers must be installed
-- For the UI to work, keep `export_dwf_ui.dcl` in the same folder as the `.lsp` file.
+- For the UI to work, place the `export_dwf_ui.dcl` file **in the same folder as your target drawing (.dwg) file** or add it to the AutoCAD Support File Search Path.
 
 ## Changelog
 
