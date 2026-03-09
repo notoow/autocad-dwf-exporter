@@ -1,52 +1,49 @@
 ;;; ============================================================
-;;; export_dwf_main.lsp  v4
+;;; export_dwf_main.lsp  v5
 ;;;
 ;;; 기능: 모델 공간의 블록참조(INSERT) 또는 폴리라인 테두리를
 ;;;       감지하여 각각 DWF 또는 PDF 로 일괄 내보내기
 ;;;
-;;; 지원 버전: AutoCAD 2015 ~ 2025 (R19 ~ R25)
-;;;            한국어판 / 영문판 모두 동작
+;;; 지원: AutoCAD 2015 ~ 2025 (R19 ~ R25), 한/영 모두 동작
 ;;;
-;;; 포함 파일:
+;;; 파일 구성 (같은 폴더에 위치):
 ;;;   - export_dwf_main.lsp  (이 파일)
-;;;   - export_dwf_ui.dcl    (다이얼로그, 같은 폴더에 위치)
+;;;   - export_dwf_ui.dcl    (다이얼로그)
 ;;;
-;;; 사용법:
-;;;   APPLOAD → export_dwf_main.lsp 로드
-;;;   명령창에 EXPORT-DWF 입력
+;;; 사용법: APPLOAD → export_dwf_main.lsp → 명령: EXPORT-DWF
 ;;;
-;;; 플롯 방식 (버전 자동 선택):
-;;;   R21 이상(2016+): ActiveX Plot 객체 → PlotToFile  [안정적]
-;;;   R20 이하(2015):  -PLOT 명령 폴백                 [호환용]
+;;; 플롯 엔진 (버전 자동 선택):
+;;;   R21+(2016~): ActiveX PlotToFile  → 실패 시 -PLOT 자동 폴백
+;;;   R20-(2015) : -PLOT 명령
 ;;; ============================================================
 
 (vl-load-com)
 
 ;;; ============================================================
-;;; 섹션 1: 설정 관리 (연관 리스트)
+;;; 섹션 1: 설정 관리
 ;;; ============================================================
 
 (setq *edwf:cfg* nil)
 
-(defun edwf:init (doc / full-path)
-  (setq full-path (vla-get-fullname doc))
+(defun edwf:init (doc / fp)
+  (setq fp (vla-get-fullname doc))
   (setq *edwf:cfg*
     (list
-      (cons "mode"      "sample")
-      (cons "layer"     "")
-      (cons "aci"       0)
-      (cons "format"    "DWF")
-      (cons "plotter"   "DWF6 ePlot.pc3")
-      (cons "ext"       ".dwf")
-      (cons "folder"    (if (and full-path (/= full-path ""))
-                          (vl-filename-directory full-path)
-                          "C:\\Temp"))
-      (cons "prefix"    "도면")
-      (cons "minsize"   500)
+      (cons "mode"       "sample")
+      (cons "layer"      "")
+      (cons "aci"        0)
+      (cons "format"     "DWF")
+      (cons "plotter"    "DWF6 ePlot.pc3")
+      (cons "ext"        ".dwf")
+      (cons "folder"     (if (and fp (/= fp ""))
+                           (vl-filename-directory fp)
+                           "C:\\Temp"))
+      (cons "prefix"     "도면")
+      (cons "minsize"    500)
       (cons "sample-lyr" nil)
       (cons "sample-aci" nil))))
 
-(defun edwf:g (k)     (cdr (assoc k *edwf:cfg*)))
+(defun edwf:g (k)   (cdr (assoc k *edwf:cfg*)))
 (defun edwf:s (k v / p)
   (setq p (assoc k *edwf:cfg*))
   (if p
@@ -57,25 +54,30 @@
 ;;; 섹션 2: AutoCAD 버전 감지
 ;;; ============================================================
 
-(defun edwf:acad-ver ( / ver-str)
-  ;; ACADVER 예: "25.0s (LMS Tech)", "24.1", "25,0" (일부 로컬)
-  ;; atoi는 첫 번째 비숫자 문자에서 멈추므로
-  ;; 쉼표("25,0") 케이스도 25로 정상 파싱됨
-  (setq ver-str (getvar "ACADVER"))
-  (atoi ver-str))
+(defun edwf:acad-ver ()
+  ;; ACADVER 예: "25.0s", "24.1", "25,0" (로컬라이즈)
+  ;; atoi는 첫 비숫자 문자에서 중단 → 주 버전 정수 반환
+  (atoi (getvar "ACADVER")))
 
 ;;; ============================================================
-;;; 섹션 3: 유틸리티
+;;; 섹션 3: 유틸리티 - 중첩 폴더 생성
 ;;; ============================================================
 
-;;; ── 중첩 폴더 생성 (vl-mkdir은 1단계만 생성) ──────────────
-(defun edwf:ensure-dir (path / parent)
-  (if (not (vl-file-directory-p path))
-    (progn
-      (setq parent (vl-filename-directory path))
-      (if (and parent (/= parent "") (/= parent path))
-        (edwf:ensure-dir parent))
-      (vl-mkdir path))))
+(defun edwf:ensure-dir (path)
+  (edwf:ensure-dir-r path 0))
+
+(defun edwf:ensure-dir-r (path depth / parent)
+  (cond
+    ((vl-file-directory-p path) T)
+    ((>= depth 20)
+     (princ (strcat "\n  [경고] 폴더 생성 깊이 초과: " path))
+     nil)
+    (T
+     (setq parent (vl-filename-directory path))
+     (if (and parent (/= parent "") (/= parent path))
+       (edwf:ensure-dir-r parent (1+ depth)))
+     (vl-mkdir path)
+     (vl-file-directory-p path))))
 
 ;;; ============================================================
 ;;; 섹션 4: 메인 명령
@@ -88,44 +90,47 @@
   (edwf:init doc)
 
   (princ "\n================================================")
-  (princ "\n  DWF/PDF 일괄 내보내기  v4")
+  (princ "\n  DWF/PDF 일괄 내보내기  v5")
   (princ (strcat "\n  AutoCAD R" (itoa (edwf:acad-ver))))
+  (princ (strcat "\n  엔진: "
+    (if (>= (edwf:acad-ver) 21)
+      "ActiveX (+ -PLOT 폴백)"
+      "-PLOT 명령")))
   (princ "\n================================================")
 
-  ;; DCL 탐색
   (setq dcl-file (edwf:find-dcl))
 
-  (if (null dcl-file)
-    (progn
-      (princ "\n  DCL 없음 → 텍스트 모드")
-      (edwf:textmode doc))
-    (progn
-      (setq dcl-id (load_dialog dcl-file))
-      (if (< dcl-id 0)
-        (progn
-          (princ "\n  DCL 로드 실패 → 텍스트 모드")
-          (edwf:textmode doc))
-        (progn
-          (setq dlg-result (edwf:run-dialog dcl-id doc))
-          (unload_dialog dcl-id)
-          (cond
-            ((= dlg-result 0) (princ "\n취소됨."))
-            ((= dlg-result 1) (edwf:run-export doc)))))))
+  (cond
+    ((null dcl-file)
+     (princ "\n  DCL 없음 → 텍스트 모드")
+     (edwf:textmode doc))
+    (T
+     (setq dcl-id (load_dialog dcl-file))
+     (cond
+       ((< dcl-id 0)
+        (princ "\n  DCL 로드 실패 → 텍스트 모드")
+        (edwf:textmode doc))
+       (T
+        (setq dlg-result (edwf:run-dialog dcl-id doc))
+        (unload_dialog dcl-id)
+        (cond
+          ((= dlg-result 1) (edwf:run-export doc))
+          (T                (princ "\n취소됨."))))))))
   (princ))
 
 ;;; ============================================================
 ;;; 섹션 5: DCL 파일 탐색
 ;;; ============================================================
 
-(defun edwf:find-dcl ( / candidates c result)
+(defun edwf:find-dcl ( / candidates result)
   (setq result nil)
   (setq candidates
     (list
       (findfile "export_dwf_ui.dcl")
       (if (findfile "export_dwf_main.lsp")
-        (strcat (vl-filename-directory
-                  (findfile "export_dwf_main.lsp"))
-                "\\export_dwf_ui.dcl"))
+        (strcat
+          (vl-filename-directory (findfile "export_dwf_main.lsp"))
+          "\\export_dwf_ui.dcl"))
       (strcat (edwf:g "folder") "\\export_dwf_ui.dcl")))
   (foreach c candidates
     (if (and (null result) c (findfile c))
@@ -141,7 +146,7 @@
     (progn (princ "\n다이얼로그 생성 실패.") 0)
     (progn
       (edwf:dlg-init)
-      (edwf:dlg-callbacks doc)
+      (edwf:dlg-callbacks)
       (setq dlg-result (start_dialog))
 
       ;; 샘플 선택 루프 (done_dialog 2)
@@ -151,14 +156,14 @@
           (progn (princ "\n재오픈 실패.") (setq dlg-result 0))
           (progn
             (edwf:dlg-init)
-            (edwf:dlg-callbacks doc)
+            (edwf:dlg-callbacks)
             (if (edwf:g "sample-lyr")
               (set_tile "txt_sample"
                 (strcat "[OK] " (edwf:g "sample-lyr")
                   (if (and (edwf:g "sample-aci")
                            (> (edwf:g "sample-aci") 0))
                     (strcat "  ACI:" (itoa (edwf:g "sample-aci")))
-                    ""))))
+                    "  (ByLayer)"))))
             (setq dlg-result (start_dialog)))))
       dlg-result)))
 
@@ -171,7 +176,7 @@
   (set_tile "ed_minsize" (itoa (edwf:g "minsize")))
   (set_tile "txt_count"  "감지된 개수: -"))
 
-(defun edwf:dlg-callbacks (doc)
+(defun edwf:dlg-callbacks ()
   (action_tile "rb_sample" "(edwf:s \"mode\" \"sample\")")
   (action_tile "rb_layer"  "(edwf:s \"mode\" \"layer\")")
   (action_tile "btn_pick"  "(done_dialog 2)")
@@ -186,10 +191,9 @@
             "(edwf:s \"ext\" \".pdf\")"))
 
   (action_tile "btn_browse"  "(edwf:browse-folder)")
-  (action_tile "btn_preview"
-    "(edwf:dlg-save)(edwf:dlg-preview)")
+  (action_tile "btn_preview" "(edwf:dlg-save)(edwf:dlg-preview)")
 
-  (action_tile "ed_layer"   "(edwf:s \"layer\"  $value)")
+  (action_tile "ed_layer"   "(edwf:s \"layer\"   $value)")
   (action_tile "ed_aci"
     "(edwf:s \"aci\" (if (= $value \"\") 0 (atoi $value)))")
   (action_tile "ed_folder"  "(edwf:s \"folder\"  $value)")
@@ -200,43 +204,34 @@
   (action_tile "accept" "(edwf:dlg-save)(done_dialog 1)")
   (action_tile "cancel" "(done_dialog 0)"))
 
-;;; ── 다이얼로그 값 저장 (let 제거 → setq 사용) ──────────────
-(defun edwf:dlg-save ( / tmp-min tmp-aci-str)
+(defun edwf:dlg-save ( / tmp-min tmp-aci)
   (edwf:s "layer"  (get_tile "ed_layer"))
   (edwf:s "folder" (get_tile "ed_folder"))
   (edwf:s "prefix" (get_tile "ed_prefix"))
-
-  ;; minsize
   (setq tmp-min (atoi (get_tile "ed_minsize")))
   (edwf:s "minsize" (if (> tmp-min 0) tmp-min 500))
-
-  ;; aci
-  (setq tmp-aci-str (get_tile "ed_aci"))
-  (edwf:s "aci"
-    (if (or (null tmp-aci-str) (= tmp-aci-str ""))
-      0 (atoi tmp-aci-str))))
+  (setq tmp-aci (get_tile "ed_aci"))
+  (edwf:s "aci" (if (or (null tmp-aci) (= tmp-aci "")) 0 (atoi tmp-aci))))
 
 (defun edwf:dlg-preview ( / doc bds)
   (setq doc (vla-get-activedocument (vlax-get-acad-object)))
   (setq bds (edwf:detect doc))
   (set_tile "txt_count"
-    (strcat "감지된 개수: "
-      (itoa (if bds (length bds) 0)) "개")))
+    (strcat "감지된 개수: " (itoa (if bds (length bds) 0)) "개")))
 
-;;; ── 폴더 찾아보기 ─────────────────────────────────────────
 (defun edwf:browse-folder ( / shell fo fp)
-  (setq shell (vl-catch-all-apply
-                'vlax-create-object (list "Shell.Application")))
+  (setq shell
+    (vl-catch-all-apply 'vlax-create-object (list "Shell.Application")))
   (if (and shell (not (vl-catch-all-error-p shell)))
     (progn
-      (setq fo (vl-catch-all-apply
-                 'vlax-invoke-method
-                 (list shell 'BrowseForFolder 0 "저장 폴더 선택" 0 "")))
+      (setq fo
+        (vl-catch-all-apply 'vlax-invoke-method
+          (list shell 'BrowseForFolder 0 "저장 폴더 선택" 0 "")))
       (if (and fo (not (vl-catch-all-error-p fo)))
         (progn
-          (setq fp (vl-catch-all-apply
-                     'vlax-get-property
-                     (list (vlax-get-property fo 'Self) 'Path)))
+          (setq fp
+            (vl-catch-all-apply 'vlax-get-property
+              (list (vlax-get-property fo 'Self) 'Path)))
           (if (and fp (not (vl-catch-all-error-p fp)))
             (progn
               (if (= (substr fp (strlen fp)) "\\")
@@ -250,7 +245,7 @@
 ;;; ============================================================
 
 (defun edwf:pick-sample ( / ent obj lyr dxf-color)
-  (princ "\n테두리 객체를 클릭하세요...")
+  (princ "\n테두리 객체를 클릭하세요 (INSERT 또는 LWPOLYLINE)...")
   (setq ent (car (entsel "\n선택: ")))
   (if (null ent)
     (princ "\n  선택 취소.")
@@ -258,75 +253,68 @@
       (setq obj (vlax-ename->vla-object ent))
       (setq lyr (vla-get-layer obj))
       (edwf:s "sample-lyr" lyr)
-      (edwf:s "layer" lyr)
-
-      ;; ACI 색상 (DXF 코드 62 직접 읽기)
+      (edwf:s "layer"      lyr)
       (setq dxf-color (cdr (assoc 62 (entget ent))))
       (if (and dxf-color (> dxf-color 0) (< dxf-color 256))
         (progn
           (edwf:s "sample-aci" dxf-color)
-          (edwf:s "aci" dxf-color)
-          (princ (strcat "\n  레이어: " lyr
-                         "  ACI: " (itoa dxf-color))))
+          (edwf:s "aci"        dxf-color)
+          (princ (strcat "\n  레이어: " lyr "  ACI: " (itoa dxf-color))))
         (progn
           (edwf:s "sample-aci" 0)
-          (edwf:s "aci" 0)
-          (princ (strcat "\n  레이어: " lyr
-                         "  색상: ByLayer")))))))
+          (edwf:s "aci"        0)
+          (princ (strcat "\n  레이어: " lyr "  색상: ByLayer")))))))
 
 ;;; ============================================================
-;;; 섹션 8: 테두리 감지 (INSERT + LWPOLYLINE)
+;;; 섹션 8: 테두리 감지
 ;;; ============================================================
 
-(defun edwf:detect (doc / ss flt-insert flt-poly
+(defun edwf:detect (doc / ss flt-i flt-p
                          i ent obj pt-min pt-max
                          borders minsize lyr aci)
-  (setq borders nil)
-  (setq minsize (edwf:g "minsize"))
-  (setq lyr     (edwf:g "layer"))
-  (setq aci     (edwf:g "aci"))
+  (setq borders nil
+        minsize (edwf:g "minsize")
+        lyr     (edwf:g "layer")
+        aci     (edwf:g "aci"))
 
   ;; INSERT 필터
-  (setq flt-insert (list '(0 . "INSERT")))
+  (setq flt-i (list '(0 . "INSERT")))
   (if (and lyr (/= lyr ""))
-    (setq flt-insert (append flt-insert (list (cons 8 lyr)))))
+    (setq flt-i (append flt-i (list (cons 8 lyr)))))
   (if (and aci (> aci 0) (< aci 256))
-    (setq flt-insert (append flt-insert (list (cons 62 aci)))))
+    (setq flt-i (append flt-i (list (cons 62 aci)))))
 
   ;; LWPOLYLINE 필터 (닫힌 것만)
-  (setq flt-poly (list '(0 . "LWPOLYLINE") '(70 . 1)))
+  (setq flt-p (list '(0 . "LWPOLYLINE") '(70 . 1)))
   (if (and lyr (/= lyr ""))
-    (setq flt-poly (append flt-poly (list (cons 8 lyr)))))
+    (setq flt-p (append flt-p (list (cons 8 lyr)))))
   (if (and aci (> aci 0) (< aci 256))
-    (setq flt-poly (append flt-poly (list (cons 62 aci)))))
+    (setq flt-p (append flt-p (list (cons 62 aci)))))
 
-  ;; 수집
-  (foreach flt (list flt-insert flt-poly)
+  (foreach flt (list flt-i flt-p)
     (setq ss (ssget "X" flt))
     (if ss
       (progn
         (setq i 0)
         (repeat (sslength ss)
-          (setq ent (ssname ss i))
-          (setq obj (vlax-ename->vla-object ent))
+          (setq ent (ssname ss i)
+                obj (vlax-ename->vla-object ent))
           (if (not (vl-catch-all-error-p
                      (vl-catch-all-apply
                        'vla-getboundingbox
                        (list obj 'pt-min 'pt-max))))
             (progn
-              (setq pt-min (vlax-safearray->list pt-min))
-              (setq pt-max (vlax-safearray->list pt-max))
+              (setq pt-min (vlax-safearray->list pt-min)
+                    pt-max (vlax-safearray->list pt-max))
               (if (and
                     (> (- (car  pt-max) (car  pt-min)) minsize)
                     (> (- (cadr pt-max) (cadr pt-min)) minsize))
-                (if (not (edwf:bbox-exists borders pt-min pt-max))
-                  (setq borders
-                    (cons (list pt-min pt-max) borders))))))
+                (if (not (edwf:bbox-dup-p borders pt-min pt-max))
+                  (setq borders (cons (list pt-min pt-max) borders))))))
           (setq i (1+ i))))))
   borders)
 
-;;; ── 중복 BoundingBox 체크 (허용 오차 50 단위, mm 도면 기준) ──
-(defun edwf:bbox-exists (borders pt-min pt-max / tol)
+(defun edwf:bbox-dup-p (borders pt-min pt-max / tol)
   (setq tol 50)
   (vl-some
     (function
@@ -339,7 +327,7 @@
     borders))
 
 ;;; ============================================================
-;;; 섹션 9: 정렬 (위→아래, 좌→우)
+;;; 섹션 9: 정렬
 ;;; ============================================================
 
 (defun edwf:sort (borders / hs avg-h thr)
@@ -347,12 +335,11 @@
     (progn
       (setq hs
         (mapcar
-          (function
-            (lambda (b)
-              (abs (- (cadr (cadr b)) (cadr (car b))))))
+          (function (lambda (b)
+            (abs (- (cadr (cadr b)) (cadr (car b))))))
           borders))
       (setq avg-h (/ (apply '+ hs) (float (length hs))))
-      (setq thr (* 0.40 avg-h))
+      (setq thr   (* 0.40 avg-h))
       (vl-sort borders
         (function
           (lambda (a b / ay by ax bx)
@@ -362,7 +349,7 @@
               (> ay by) (< ax bx))))))))
 
 ;;; ============================================================
-;;; 섹션 10: 플롯 엔진 (버전 자동 선택)
+;;; 섹션 10: 플롯 엔진
 ;;; ============================================================
 
 (defun edwf:plot-one (pt-min pt-max filepath plotter doc layout)
@@ -370,90 +357,89 @@
     (edwf:plot-activex pt-min pt-max filepath plotter doc layout)
     (edwf:plot-command pt-min pt-max filepath plotter)))
 
-;;; ────────────────────────────────────────────────────────────
-;;; 방법 A: ActiveX PlotToFile (R21+ / 2016+)
-;;; ────────────────────────────────────────────────────────────
+;;; ── 방법 A: ActiveX (R21+) ─────────────────────────────────
 (defun edwf:plot-activex (pt-min pt-max filepath plotter
                            doc layout
                            / plot-obj win-min win-max
                              old-cfg old-ptype old-ustd
                              old-scale old-rot old-center
                              old-bgplot old-err
-                             result)
+                             result fallback-p)
 
-  ;; 에러 핸들러 (설정 복원 보장)
-  (setq old-err *error*)
-  (defun *error* (msg)
-    ;; 레이아웃 설정 복원
-    (edwf:restore-layout layout
-      old-cfg old-ptype old-ustd old-scale old-rot old-center)
-    (setvar "BACKGROUNDPLOT" old-bgplot)
-    (if (not (wcmatch (strcase msg) "*CANCEL*,*QUIT*,*EXIT*"))
-      (princ (strcat "\n    ActiveX 오류: " msg)))
-    (setq *error* old-err))
-
-  ;; 시스템 변수
+  (setq fallback-p nil)
   (setq old-bgplot (getvar "BACKGROUNDPLOT"))
   (setvar "BACKGROUNDPLOT" 0)
 
-  ;; 레이아웃 설정 백업
-  (setq old-cfg    (vl-catch-all-apply 'vla-get-ConfigName       (list layout)))
-  (setq old-ptype  (vl-catch-all-apply 'vla-get-PlotType         (list layout)))
-  (setq old-ustd   (vl-catch-all-apply 'vla-get-UseStandardScale (list layout)))
-  (setq old-scale  (vl-catch-all-apply 'vla-get-StandardScale    (list layout)))
-  (setq old-rot    (vl-catch-all-apply 'vla-get-PlotRotation     (list layout)))
-  (setq old-center (vl-catch-all-apply 'vla-get-CenterPlot       (list layout)))
+  ;; 레이아웃 백업 (error 등록 전에 완료)
+  (setq old-cfg    (vl-catch-all-apply 'vla-get-ConfigName       (list layout))
+        old-ptype  (vl-catch-all-apply 'vla-get-PlotType         (list layout))
+        old-ustd   (vl-catch-all-apply 'vla-get-UseStandardScale (list layout))
+        old-scale  (vl-catch-all-apply 'vla-get-StandardScale    (list layout))
+        old-rot    (vl-catch-all-apply 'vla-get-PlotRotation     (list layout))
+        old-center (vl-catch-all-apply 'vla-get-CenterPlot       (list layout)))
+
+  ;; *error* 등록
+  (setq old-err *error*)
+  (defun *error* (msg)
+    (edwf:restore-layout layout
+      old-cfg old-ptype old-ustd old-scale old-rot old-center)
+    (setvar "BACKGROUNDPLOT" old-bgplot)
+    (setq *error* old-err)
+    (if (not (wcmatch (strcase msg) "*CANCEL*,*QUIT*,*EXIT*"))
+      (princ (strcat "\n    ActiveX 오류: " msg))))
 
   ;; 플롯 설정 적용
   (vl-catch-all-apply 'vla-put-ConfigName       (list layout plotter))
-  (vl-catch-all-apply 'vla-put-PlotType         (list layout 4))       ; acWindow
+  (vl-catch-all-apply 'vla-put-PlotType         (list layout 4))
   (vl-catch-all-apply 'vla-put-UseStandardScale (list layout :vlax-true))
-  (vl-catch-all-apply 'vla-put-StandardScale    (list layout 0))       ; Fit
+  (vl-catch-all-apply 'vla-put-StandardScale    (list layout 0))
   (vl-catch-all-apply 'vla-put-PlotRotation     (list layout 0))
   (vl-catch-all-apply 'vla-put-CenterPlot       (list layout :vlax-true))
 
   ;; 윈도우 영역
-  (setq win-min (vlax-make-safearray vlax-vbDouble '(0 . 1)))
+  (setq win-min (vlax-make-safearray vlax-vbDouble '(0 . 1))
+        win-max (vlax-make-safearray vlax-vbDouble '(0 . 1)))
   (vlax-safearray-put-element win-min 0 (car  pt-min))
   (vlax-safearray-put-element win-min 1 (cadr pt-min))
-  (setq win-max (vlax-make-safearray vlax-vbDouble '(0 . 1)))
   (vlax-safearray-put-element win-max 0 (car  pt-max))
   (vlax-safearray-put-element win-max 1 (cadr pt-max))
   (vl-catch-all-apply 'vla-SetWindowToPlot (list layout win-min win-max))
 
-  ;; Plot 객체 (vlax-get-property 사용)
+  ;; Plot 객체
   (setq plot-obj
     (vl-catch-all-apply 'vlax-get-property (list doc 'Plot)))
 
-  ;; PlotToFile 실행
-  (if (and plot-obj (not (vl-catch-all-error-p plot-obj)))
-    (setq result
-      (vl-catch-all-apply 'vla-PlotToFile (list plot-obj filepath)))
-    (progn
-      (princ "\n    Plot 객체 실패 → -PLOT 폴백")
-      ;; 설정 복원 후 폴백
-      (edwf:restore-layout layout
-        old-cfg old-ptype old-ustd old-scale old-rot old-center)
-      (setvar "BACKGROUNDPLOT" old-bgplot)
-      (setq *error* old-err)
-      (edwf:plot-command pt-min pt-max filepath plotter)))
+  ;; 실행
+  (cond
+    ((or (null plot-obj) (vl-catch-all-error-p plot-obj))
+     (princ "\n    Plot 객체 실패 → -PLOT 폴백")
+     (setq fallback-p T))
+    (T
+     (setq result
+       (vl-catch-all-apply 'vla-PlotToFile (list plot-obj filepath)))
+     (if (vl-catch-all-error-p result)
+       (progn
+         (princ (strcat "\n    PlotToFile 실패: "
+                  (vl-catch-all-error-message result)
+                  " → -PLOT 폴백"))
+         (setq fallback-p T)))))
 
-  ;; 설정 복원
+  ;; 복원
   (edwf:restore-layout layout
     old-cfg old-ptype old-ustd old-scale old-rot old-center)
   (setvar "BACKGROUNDPLOT" old-bgplot)
   (setq *error* old-err)
 
   ;; 결과
-  (if (vl-catch-all-error-p result)
-    (progn
-      (princ (strcat "\n    ActiveX 실패 → -PLOT 폴백"))
-      (edwf:plot-command pt-min pt-max filepath plotter))
-    (if (findfile filepath)
-      (progn (princ " OK") T)
-      (progn (princ " FAIL") nil))))
+  (cond
+    (fallback-p
+     (edwf:plot-command pt-min pt-max filepath plotter))
+    ((findfile filepath)
+     (princ " OK") T)
+    (T
+     (princ " FAIL") nil)))
 
-;;; ── 레이아웃 설정 복원 헬퍼 ─────────────────────────────────
+;;; ── 레이아웃 복원 헬퍼 ──────────────────────────────────────
 (defun edwf:restore-layout (layout cfg ptype ustd scale rot center)
   (if (and cfg    (not (vl-catch-all-error-p cfg)))
     (vl-catch-all-apply 'vla-put-ConfigName       (list layout cfg)))
@@ -468,14 +454,10 @@
   (if (and center (not (vl-catch-all-error-p center)))
     (vl-catch-all-apply 'vla-put-CenterPlot       (list layout center))))
 
-;;; ────────────────────────────────────────────────────────────
-;;; 방법 B: -PLOT 명령 (R20 이하 폴백 / ActiveX 실패 시)
-;;;
-;;; Model 탭 + 가상 플로터(DWF/PDF) 기준 프롬프트 순서.
-;;; 주의: AutoCAD 버전에 따라 프롬프트가 다소 다를 수 있음.
-;;;       "Scale lineweights" 프롬프트가 없는 버전에서는
-;;;       해당 줄 제거 필요.
-;;; ────────────────────────────────────────────────────────────
+;;; ── 방법 B: -PLOT 명령 (R20 이하 / 폴백) ───────────────────
+;;; Model 탭 + 가상 플로터 기준 프롬프트 순서.
+;;; "Scale lineweights" 프롬프트가 없는 AutoCAD 버전에서는
+;;; 이후 응답이 밀릴 수 있음 (FAIL 메시지로 안내).
 (defun edwf:plot-command (pt-min pt-max filepath plotter
                            / old-ce old-bg old-fd old-err
                              x1s y1s x2s y2s plot-ok)
@@ -503,17 +485,14 @@
         x2s (rtos (car  pt-max) 2 4)
         y2s (rtos (cadr pt-max) 2 4))
 
-  ;; -PLOT: Model 탭 + 가상 플로터 기준
-  ;; Paper space 관련 프롬프트 제외 (Model 탭에서 안 나옴)
-  ;; "Write to file" 프롬프트는 가상 플로터에서 항상 나옴 → 유지
   (command
     "_.-PLOT"
     "_Yes"                          ; 상세 설정
     ""                              ; 현재 레이아웃
     plotter                         ; 플로터
     ""                              ; 용지 (현재 유지)
-    "_Millimeters"                  ; 단위 (명시적)
-    "_Landscape"                    ; 방향 (명시적)
+    ""                              ; 단위 (현재 유지)
+    ""                              ; 방향 (현재 유지)
     "_No"                           ; 뒤집기
     "_Window"                       ; 영역
     (strcat x1s "," y1s)            ; 좌하단
@@ -521,9 +500,9 @@
     "_Fit"                          ; 스케일
     "0,0"                           ; 오프셋
     "_Yes"                          ; 플롯 스타일
-    ""                              ; CTB (현재 유지, "." 대신 Enter)
-    "_Yes"                          ; 선 가중치
-    "_No"                           ; 선 가중치 스케일링
+    ""                              ; CTB (현재 유지)
+    "_Yes"                          ; 선가중치
+    "_No"                           ; 선가중치 스케일링
     "_Yes"                          ; 파일에 플롯 (가상 플로터 필수)
     filepath                        ; 파일 경로
     "_No"                           ; 설정 저장 안 함
@@ -552,7 +531,7 @@
   (setq borders (edwf:detect doc))
 
   (if (or (null borders) (= (length borders) 0))
-    (princ "\n[오류] 테두리 없음. 레이어명/ACI/최소 크기 확인.")
+    (princ "\n[오류] 테두리 없음. 레이어명 / ACI / 최소 크기 확인.")
     (progn
       (princ (strcat "\n  " (itoa (length borders)) "개 감지. 정렬 중..."))
       (setq sorted (edwf:sort borders))
@@ -562,15 +541,17 @@
             plotter (edwf:g "plotter")
             ext     (edwf:g "ext"))
 
-      ;; 중첩 폴더 생성
       (edwf:ensure-dir folder)
 
-      (setq layout (vla-get-activelayout doc))
-      (setq cnt 1 ok-cnt 0 fail-cnt 0)
+      (setq layout   (vla-get-activelayout doc)
+            cnt      1
+            ok-cnt   0
+            fail-cnt 0)
 
       (foreach bd sorted
-        (setq pt-min (car bd) pt-max (cadr bd))
-        (setq fpath (strcat folder "\\" prefix (itoa cnt) ext))
+        (setq pt-min (car  bd)
+              pt-max (cadr bd)
+              fpath  (strcat folder "\\" prefix (itoa cnt) ext))
         (princ (strcat "\n  [" (itoa cnt) "/"
                        (itoa (length sorted)) "] "
                        prefix (itoa cnt) ext))
@@ -589,13 +570,12 @@
       (princ "\n================================================\n"))))
 
 ;;; ============================================================
-;;; 섹션 12: 텍스트 모드 (DCL 없을 때)
+;;; 섹션 12: 텍스트 모드
 ;;; ============================================================
 
 (defun edwf:textmode (doc / mode fmt folder tmp-aci)
-  (princ "\n[텍스트 모드]")
+  (princ "\n[텍스트 모드]\n")
 
-  ;; 감지 방식
   (initget "Sample Layer")
   (setq mode (getkword "\n감지 [Sample 클릭/Layer 이름] <Sample>: "))
   (if (null mode) (setq mode "Sample"))
@@ -607,18 +587,18 @@
       (setq tmp-aci (getint "\nACI 번호 (0=전체): "))
       (edwf:s "aci" (if tmp-aci tmp-aci 0))))
 
-  ;; 형식
   (initget "DWF PDF")
   (setq fmt (getkword "\n형식 [DWF/PDF] <DWF>: "))
-  (if (= fmt "PDF")
-    (progn (edwf:s "format" "PDF")
-           (edwf:s "plotter" "DWG To PDF.pc3")
-           (edwf:s "ext" ".pdf"))
-    (progn (edwf:s "format" "DWF")
-           (edwf:s "plotter" "DWF6 ePlot.pc3")
-           (edwf:s "ext" ".dwf")))
+  (cond
+    ((= fmt "PDF")
+     (edwf:s "format" "PDF")
+     (edwf:s "plotter" "DWG To PDF.pc3")
+     (edwf:s "ext" ".pdf"))
+    (T
+     (edwf:s "format" "DWF")
+     (edwf:s "plotter" "DWF6 ePlot.pc3")
+     (edwf:s "ext" ".dwf")))
 
-  ;; 폴더
   (setq folder
     (getstring T (strcat "\n폴더 [" (edwf:g "folder") "]: ")))
   (if (and folder (/= folder ""))
@@ -627,13 +607,13 @@
   (edwf:run-export doc))
 
 ;;; ============================================================
-;;; 로드 메시지
-;;; ============================================================
 (princ "\n================================================")
-(princ "\n  export_dwf_main.lsp v4")
+(princ "\n  export_dwf_main.lsp v5")
 (princ (strcat "\n  AutoCAD R" (itoa (edwf:acad-ver))))
 (princ (strcat "\n  엔진: "
-  (if (>= (edwf:acad-ver) 21) "ActiveX + -PLOT 폴백" "-PLOT 명령")))
+  (if (>= (edwf:acad-ver) 21)
+    "ActiveX (실패 시 -PLOT 자동 폴백)"
+    "-PLOT 명령")))
 (princ "\n  명령: EXPORT-DWF")
 (princ "\n================================================")
 (princ)
