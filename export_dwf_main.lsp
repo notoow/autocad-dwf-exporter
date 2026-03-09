@@ -130,8 +130,8 @@
 ;;; ============================================================
 
 (defun edwf:find-dcl ( / candidates result)
-  ;; *edwf:dir* = 로드 시점에 저장된 이 LSP 파일의 폴더
-  ;; → 어떤 경로에 설치해도 DCL을 자동으로 찾음
+  ;; *edwf:dir* = 로드 시점에 저장한 이 LSP 파일의 폴더
+  ;; → 어느 경로에 설치해도 DCL 자동 탐색
   (setq result nil)
   (setq candidates
     (list
@@ -140,7 +140,7 @@
       (findfile "export_dwf_ui.dcl")
       (strcat (edwf:g "folder") "\\export_dwf_ui.dcl")))
   (foreach c candidates
-    (if (and (null result) c (vl-file-exists-p c))
+    (if (and (null result) c (findfile c))
       (setq result c)))
   result)
 
