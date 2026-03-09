@@ -1,0 +1,17 @@
+# Backup files
+*.bak
+*.tmp
+*~
+
+# AutoCAD temp files
+*.ac$
+*.sv$
+*.dwl
+*.dwl2
+
+# DWF output files
+*.dwf
+
+# OS files
+Thumbs.db
+.DS_Store
