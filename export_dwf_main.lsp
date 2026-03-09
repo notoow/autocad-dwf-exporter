@@ -115,7 +115,7 @@
         (unload_dialog dcl-id)
         (cond
           ((= dlg-result 1) (edwf:run-export doc))
-          (T                (princ "\n취소됨."))))))))
+          (T                (princ "\n취소됨.")))))))
   (princ))
 
 ;;; ============================================================
