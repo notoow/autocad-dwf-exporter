@@ -1,4 +1,4 @@
-# AutoCAD Sheet Exporter
+# AutoCAD PDF/DWF Batch Exporter for Sheet Borders
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![AutoCAD](https://img.shields.io/badge/AutoCAD-2015~2025-red.svg)](https://www.autodesk.com/products/autocad)
@@ -11,8 +11,20 @@
 <a id="ko"></a>
 ## 한국어
 
-모델 공간의 테두리 객체를 감지해서 각 시트를 개별 `DWF` 또는 `PDF`로 내보내는 AutoLISP 스크립트입니다.
-`INSERT` 블록 참조와 닫힌 `LWPOLYLINE` 테두리를 지원하며, 필요하면 `PDF + DWF`를 한 번에 둘 다 생성할 수 있습니다.
+AutoCAD에서 `PDF 일괄 출력`, `DWF 일괄 내보내기`, `도면 낱장 저장`, `batch plot`, `sheet export`가 필요할 때 쓰는 AutoLISP 스크립트입니다.
+모델 공간의 테두리 객체를 감지해서 각 시트를 개별 `DWF` 또는 `PDF`로 내보내며, `INSERT` 블록 참조와 닫힌 `LWPOLYLINE` 테두리를 지원합니다.
+필요하면 `PDF + DWF`를 한 번에 둘 다 생성할 수 있습니다.
+
+### 검색 키워드
+
+- `AutoCAD PDF 일괄 출력`
+- `AutoCAD PDF 자동 저장`
+- `AutoCAD DWF 일괄 내보내기`
+- `AutoCAD batch plot`
+- `AutoCAD sheet export`
+- `AutoCAD AutoLISP PDF export`
+- `AutoCAD 도면 낱장 출력`
+- `AutoCAD 테두리 감지 출력`
 
 ### 주요 기능
 
@@ -99,8 +111,19 @@ python encode_euckr.py export_dwf_ui.dcl
 <a id="english"></a>
 ## English
 
-AutoLISP utility for detecting sheet borders in model space and exporting each sheet as an individual `DWF` or `PDF` file.
+AutoLISP utility for `AutoCAD PDF batch export`, `AutoCAD DWF export`, `batch plot`, and per-sheet drawing output from model-space borders.
+It detects sheet borders in model space and exports each sheet as an individual `DWF` or `PDF` file.
 It supports both `INSERT` block references and closed `LWPOLYLINE` borders, and can optionally export both `PDF + DWF` in one batch run.
+
+### Search Keywords
+
+- `AutoCAD PDF batch export`
+- `AutoCAD DWF export`
+- `AutoCAD batch plot`
+- `AutoCAD sheet exporter`
+- `AutoCAD border detection export`
+- `AutoLISP PDF export`
+- `AutoCAD drawing region export`
 
 ### Features
 
