@@ -41,6 +41,7 @@
       (cons "prefix"     "도면")
       (cons "paper"      "")
       (cons "ctb"        "")
+      (cons "crop-mode"  "border")
       (cons "minsize"    500)
       (cons "sample-lyr" nil)
       (cons "sample-aci" nil))))
@@ -150,6 +151,7 @@
 ;;; ============================================================
 
 (defun edwf:get-papers (plotter layout / old-cfg result lst err)
+  ;; 임시로 플로터를 변경하여 용지 목록 취득 후 원래대로 복원
   (setq old-cfg (vl-catch-all-apply 'vla-get-ConfigName (list layout)))
   (setq err (vl-catch-all-apply 'vla-put-ConfigName (list layout plotter)))
   (if (not (vl-catch-all-error-p err))
@@ -158,6 +160,7 @@
       (setq result (vl-catch-all-apply 'vla-GetCanonicalMediaNames (list layout)))
       (if (not (vl-catch-all-error-p result))
         (setq lst (vlax-safearray->list (vlax-variant-value result))))))
+  ;; 원래 플로터로 복원
   (if (not (vl-catch-all-error-p old-cfg))
     (vl-catch-all-apply 'vla-put-ConfigName (list layout old-cfg)))
   (if lst (vl-sort lst '<) nil))
@@ -200,6 +203,10 @@
       dlg-result)))
 
 (defun edwf:dlg-init ()
+  (set_tile "rb_sample"  (if (= (edwf:g "mode") "layer") "0" "1"))
+  (set_tile "rb_layer"   (if (= (edwf:g "mode") "layer") "1" "0"))
+  (set_tile "rb_dwf"     (if (= (edwf:g "format") "PDF") "0" "1"))
+  (set_tile "rb_pdf"     (if (= (edwf:g "format") "PDF") "1" "0"))
   (set_tile "ed_layer"   (if (edwf:g "layer") (edwf:g "layer") ""))
   (set_tile "ed_aci"     (if (> (edwf:g "aci") 0)
                            (itoa (edwf:g "aci")) ""))
@@ -210,8 +217,17 @@
   (set_tile "ed_minsize" (itoa (edwf:g "minsize")))
   (set_tile "txt_count"  "감지된 개수: -")
   
+  (edwf:update-crop-mode-list)
   (edwf:update-paper-list (edwf:g "plotter"))
   (edwf:update-ctb-list))
+
+(defun edwf:update-crop-mode-list ()
+  (start_list "cb_crop_mode")
+  (add_list "테두리 기준")
+  (add_list "내부 내용 기준 크롭")
+  (end_list)
+  (set_tile "cb_crop_mode"
+    (if (= (edwf:g "crop-mode") "content") "1" "0")))
 
 (defun edwf:update-paper-list (plotter / acad doc layout)
   (setq acad   (vlax-get-acad-object)
@@ -254,6 +270,11 @@
       (set_tile "ed_ctb" c)
       (edwf:s "ctb" c))))
 
+(defun edwf:cb-crop-mode-action (val)
+  (if (= (atoi val) 1)
+    (edwf:s "crop-mode" "content")
+    (edwf:s "crop-mode" "border")))
+
 (defun edwf:dlg-callbacks ()
   (action_tile "rb_sample" "(edwf:s \"mode\" \"sample\")")
   (action_tile "rb_layer"  "(edwf:s \"mode\" \"layer\")")
@@ -284,6 +305,7 @@
   (action_tile "ed_paper"   "(edwf:s \"paper\"   $value)")
   (action_tile "cb_ctb"     "(edwf:cb-ctb-action $value)")
   (action_tile "ed_ctb"     "(edwf:s \"ctb\"     $value)")
+  (action_tile "cb_crop_mode" "(edwf:cb-crop-mode-action $value)")
   (action_tile "ed_minsize"
     "(edwf:s \"minsize\" (if (= $value \"\") 500 (atoi $value)))")
 
@@ -296,6 +318,8 @@
   (edwf:s "prefix" (get_tile "ed_prefix"))
   (edwf:s "paper"  (get_tile "ed_paper"))
   (edwf:s "ctb"    (get_tile "ed_ctb"))
+  (edwf:s "crop-mode"
+    (if (= (get_tile "cb_crop_mode") "1") "content" "border"))
   (setq tmp-min (atoi (get_tile "ed_minsize")))
   (edwf:s "minsize" (if (> tmp-min 0) tmp-min 500))
   (setq tmp-aci (get_tile "ed_aci"))
@@ -326,6 +350,8 @@
                 (setq fp (substr fp 1 (1- (strlen fp)))))
               (edwf:s "folder" fp)
               (set_tile "ed_folder" fp)))))
+      (if (and fo (not (vl-catch-all-error-p fo)))
+        (vlax-release-object fo))
       (vlax-release-object shell))))
 
 ;;; ============================================================
@@ -398,7 +424,7 @@
                     (> (- (car  pt-max) (car  pt-min)) minsize)
                     (> (- (cadr pt-max) (cadr pt-min)) minsize))
                 (if (not (edwf:bbox-dup-p borders pt-min pt-max))
-                  (setq borders (cons (list pt-min pt-max) borders))))))
+                  (setq borders (cons (list pt-min pt-max ent) borders))))))
           (setq i (1+ i))))))
   borders)
 
@@ -413,6 +439,142 @@
           (< (abs (- (car  (cadr b)) (car  pt-max))) tol)
           (< (abs (- (cadr (cadr b)) (cadr pt-max))) tol))))
     borders))
+
+(defun edwf:get-bbox-safe (obj / cur-min cur-max result)
+  (setq result
+    (vl-catch-all-apply
+      (function
+        (lambda ()
+          (vla-GetBoundingBox obj 'cur-min 'cur-max)))
+      nil))
+  (if (vl-catch-all-error-p result)
+    nil
+    (list
+      (vlax-safearray->list cur-min)
+      (vlax-safearray->list cur-max))))
+
+(defun edwf:merge-bbox (cur bbox)
+  (if cur
+    (list
+      (list (min (car  (car  cur)) (car  (car  bbox)))
+            (min (cadr (car  cur)) (cadr (car  bbox))))
+      (list (max (car  (cadr cur)) (car  (cadr bbox)))
+            (max (cadr (cadr cur)) (cadr (cadr bbox)))))
+    bbox))
+
+(defun edwf:clamp-bbox (bbox outer-min outer-max)
+  (list
+    (list (max (car  (car  bbox)) (car  outer-min))
+          (max (cadr (car  bbox)) (cadr outer-min)))
+    (list (min (car  (cadr bbox)) (car  outer-max))
+          (min (cadr (cadr bbox)) (cadr outer-max)))))
+
+(defun edwf:bbox-matches-outer-p (bbox outer-min outer-max / tol)
+  (setq tol (* 0.001
+               (max (- (car  outer-max) (car  outer-min))
+                    (- (cadr outer-max) (cadr outer-min)))))
+  (if (< tol 0.01)
+    (setq tol 0.01))
+  (and
+    (< (abs (- (car  (car  bbox)) (car  outer-min))) tol)
+    (< (abs (- (cadr (car  bbox)) (cadr outer-min))) tol)
+    (< (abs (- (car  (cadr bbox)) (car  outer-max))) tol)
+    (< (abs (- (cadr (cadr bbox)) (cadr outer-max))) tol)))
+
+(defun edwf:delete-object-safe (obj)
+  (if obj
+    (vl-catch-all-apply 'vla-delete (list obj))))
+
+(defun edwf:object-list (value / tmp)
+  (setq tmp (vl-catch-all-apply 'vlax-variant-value (list value)))
+  (if (not (vl-catch-all-error-p tmp))
+    (setq value tmp))
+  (setq tmp (vl-catch-all-apply 'vlax-safearray->list (list value)))
+  (if (vl-catch-all-error-p tmp)
+    (if (listp value) value nil)
+    tmp))
+
+(defun edwf:inner-window (pt-min pt-max / width height inset)
+  (setq width  (- (car  pt-max) (car  pt-min))
+        height (- (cadr pt-max) (cadr pt-min))
+        inset  (* 0.002 (min width height)))
+  (if (< inset 0.001)
+    (setq inset 0.001))
+  (if (or (<= width (* 2 inset))
+          (<= height (* 2 inset)))
+    nil
+     (list
+       (list (+ (car  pt-min) inset) (+ (cadr pt-min) inset))
+       (list (- (car  pt-max) inset) (- (cadr pt-max) inset)))))
+
+(defun edwf:get-window-content-bbox (outer-min outer-max border-ent / inner ss i ent obj bbox crop-bbox)
+  (setq inner (edwf:inner-window outer-min outer-max))
+  (if (null inner)
+    nil
+    (progn
+      (setq ss (ssget "_C" (car inner) (cadr inner)))
+      (if ss
+        (progn
+          (setq i 0)
+          (repeat (sslength ss)
+            (setq ent (ssname ss i))
+            (if (or (null border-ent) (/= ent border-ent))
+              (progn
+                (setq obj (vlax-ename->vla-object ent)
+                      bbox (edwf:get-bbox-safe obj))
+                (if bbox
+                  (setq crop-bbox (edwf:merge-bbox crop-bbox bbox)))))
+            (setq i (1+ i)))
+          (if crop-bbox
+            (edwf:clamp-bbox crop-bbox outer-min outer-max)
+            nil))
+        nil))))
+
+(defun edwf:get-insert-content-bbox (border-ent outer-min outer-max / obj copy exploded item bbox crop-bbox)
+  (setq obj (vlax-ename->vla-object border-ent))
+  (if (or (not (vlax-method-applicable-p obj 'Copy))
+          (not (vlax-method-applicable-p obj 'Explode)))
+    nil
+    (progn
+      (setq copy (vl-catch-all-apply 'vla-copy (list obj)))
+      (if (or (null copy) (vl-catch-all-error-p copy))
+        nil
+        (progn
+          (setq exploded (vl-catch-all-apply 'vlax-invoke-method (list copy 'Explode)))
+          (edwf:delete-object-safe copy)
+          (if (vl-catch-all-error-p exploded)
+            nil
+            (progn
+              (foreach item (edwf:object-list exploded)
+                (setq bbox (edwf:get-bbox-safe item))
+                (if (and bbox
+                         (not (edwf:bbox-matches-outer-p bbox outer-min outer-max)))
+                  (setq crop-bbox (edwf:merge-bbox crop-bbox bbox)))
+                (edwf:delete-object-safe item))
+              (if crop-bbox
+                (edwf:clamp-bbox crop-bbox outer-min outer-max)
+                nil))))))))
+
+(defun edwf:get-content-bbox (bd / outer-min outer-max border-ent border-type)
+  (setq outer-min (car bd)
+        outer-max (cadr bd)
+        border-ent (if (> (length bd) 2) (caddr bd))
+        border-type (if border-ent (cdr (assoc 0 (entget border-ent))) nil))
+  (cond
+    ((null border-ent) nil)
+    ((= border-type "INSERT")
+     (edwf:get-insert-content-bbox border-ent outer-min outer-max))
+    (T
+     (edwf:get-window-content-bbox outer-min outer-max border-ent))))
+
+(defun edwf:get-output-window (bd / content-bbox)
+  (if (= (edwf:g "crop-mode") "content")
+    (progn
+      (setq content-bbox (edwf:get-content-bbox bd))
+      (if content-bbox
+        content-bbox
+        (list (car bd) (cadr bd))))
+    (list (car bd) (cadr bd))))
 
 ;;; ============================================================
 ;;; 섹션 10: 정렬
@@ -446,19 +608,52 @@
     (edwf:plot-command pt-min pt-max filepath plotter)))
 
 ;;; ── 방법 A: ActiveX (R21+) ─────────────────────────────────
+;;; ActiveX core attempt. The caller restores state and decides fallback.
+(defun edwf:plot-activex-core (pt-min pt-max filepath plotter
+                                doc layout
+                                / plot-obj win-min win-max applied)
+  (vla-put-ConfigName layout plotter)
+  (if (and (edwf:g "paper") (/= (edwf:g "paper") ""))
+    (progn
+      (vla-put-CanonicalMediaName layout (edwf:g "paper"))
+      (setq applied (vla-get-CanonicalMediaName layout))
+      (if (not (wcmatch (strcase applied) (strcase (edwf:g "paper"))))
+        (princ (strcat "\n    [경고] 용지 '" (edwf:g "paper") "' 등록 안됨 → 기본 용지로 출력됨")))))
+  (if (and (edwf:g "ctb") (/= (edwf:g "ctb") ""))
+    (vla-put-StyleSheet layout (edwf:g "ctb")))
+  (vla-put-PlotType layout 4)
+  (vla-put-UseStandardScale layout :vlax-true)
+  (vla-put-StandardScale layout 0)
+  (vla-put-PlotRotation layout 0)
+  (vla-put-CenterPlot layout :vlax-true)
+
+  (setq win-min (vlax-make-safearray vlax-vbDouble '(0 . 1))
+        win-max (vlax-make-safearray vlax-vbDouble '(0 . 1)))
+  (vlax-safearray-put-element win-min 0 (car  pt-min))
+  (vlax-safearray-put-element win-min 1 (cadr pt-min))
+  (vlax-safearray-put-element win-max 0 (car  pt-max))
+  (vlax-safearray-put-element win-max 1 (cadr pt-max))
+  (vla-SetWindowToPlot layout win-min win-max)
+
+  (setq plot-obj (vlax-get-property doc 'Plot))
+  (if (null plot-obj)
+    (progn
+      (princ "\n    Plot 객체 실패 → -PLOT 폴백")
+      'fallback)
+    (progn
+      (vla-PlotToFile plot-obj filepath)
+      T)))
+
+;;; Safe override: keep batch loop alive by catching ActiveX exceptions outside.
 (defun edwf:plot-activex (pt-min pt-max filepath plotter
                            doc layout
-                           / plot-obj win-min win-max
-                             old-cfg old-paper-name old-ctb-name old-ptype old-ustd
+                           / old-cfg old-paper-name old-ctb-name old-ptype old-ustd
                              old-scale old-rot old-center
-                             old-bgplot old-err
-                             result fallback-p applied)
-
-  (setq fallback-p nil)
+                             old-bgplot result result-msg)
   (setq old-bgplot (getvar "BACKGROUNDPLOT"))
   (setvar "BACKGROUNDPLOT" 0)
 
-  ;; 레이아웃 백업 (error 등록 전에 완료)
+  ;; 레이아웃 백업
   (setq old-cfg    (vl-catch-all-apply 'vla-get-ConfigName       (list layout))
         old-paper-name (vl-catch-all-apply 'vla-get-CanonicalMediaName (list layout))
         old-ctb-name   (vl-catch-all-apply 'vla-get-StyleSheet       (list layout))
@@ -468,77 +663,34 @@
         old-rot    (vl-catch-all-apply 'vla-get-PlotRotation     (list layout))
         old-center (vl-catch-all-apply 'vla-get-CenterPlot       (list layout)))
 
-  ;; *error* 등록
-  (setq old-err *error*)
-  (defun *error* (msg)
-    (edwf:restore-layout layout
-      old-cfg old-paper-name old-ctb-name old-ptype old-ustd old-scale old-rot old-center)
-    (setvar "BACKGROUNDPLOT" old-bgplot)
-    (setq *error* old-err)
-    (if (not (wcmatch (strcase msg) "*CANCEL*,*QUIT*,*EXIT*"))
-      (princ (strcat "\n    ActiveX 오류: " msg))))
-
-  ;; 플롯 설정 적용
-  (vl-catch-all-apply 'vla-put-ConfigName       (list layout plotter))
-  (if (and (edwf:g "paper") (/= (edwf:g "paper") ""))
-    (progn
-      (vl-catch-all-apply 'vla-put-CanonicalMediaName (list layout (edwf:g "paper")))
-      (setq applied (vl-catch-all-apply 'vla-get-CanonicalMediaName (list layout)))
-      (if (or (vl-catch-all-error-p applied)
-              (not (wcmatch (strcase applied) (strcase (edwf:g "paper")))))
-        (princ (strcat "\n    [경고] 용지 '" (edwf:g "paper") "' 등록 안됨 → 기본 용지로 출력됨")))))
-  (if (and (edwf:g "ctb") (/= (edwf:g "ctb") ""))
-    (vl-catch-all-apply 'vla-put-StyleSheet     (list layout (edwf:g "ctb"))))
-  (vl-catch-all-apply 'vla-put-PlotType         (list layout 4))
-  (vl-catch-all-apply 'vla-put-UseStandardScale (list layout :vlax-true))
-  (vl-catch-all-apply 'vla-put-StandardScale    (list layout 0))
-  (vl-catch-all-apply 'vla-put-PlotRotation     (list layout 0))
-  (vl-catch-all-apply 'vla-put-CenterPlot       (list layout :vlax-true))
-
-  ;; 윈도우 영역
-  (setq win-min (vlax-make-safearray vlax-vbDouble '(0 . 1))
-        win-max (vlax-make-safearray vlax-vbDouble '(0 . 1)))
-  (vlax-safearray-put-element win-min 0 (car  pt-min))
-  (vlax-safearray-put-element win-min 1 (cadr pt-min))
-  (vlax-safearray-put-element win-max 0 (car  pt-max))
-  (vlax-safearray-put-element win-max 1 (cadr pt-max))
-  (vl-catch-all-apply 'vla-SetWindowToPlot (list layout win-min win-max))
-
-  ;; Plot 객체
-  (setq plot-obj
-    (vl-catch-all-apply 'vlax-get-property (list doc 'Plot)))
-
-  ;; 실행
-  (cond
-    ((or (null plot-obj) (vl-catch-all-error-p plot-obj))
-     (princ "\n    Plot 객체 실패 → -PLOT 폴백")
-     (setq fallback-p T))
-    (T
-     (setq result
-       (vl-catch-all-apply 'vla-PlotToFile (list plot-obj filepath)))
-     (if (vl-catch-all-error-p result)
-       (progn
-         (princ (strcat "\n    PlotToFile 실패: "
-                  (vl-catch-all-error-message result)
-                  " → -PLOT 폴백"))
-         (setq fallback-p T)))))
+  (setq result
+    (vl-catch-all-apply
+      'edwf:plot-activex-core
+      (list pt-min pt-max filepath plotter doc layout)))
 
   ;; 복원
   (edwf:restore-layout layout
     old-cfg old-paper-name old-ctb-name old-ptype old-ustd old-scale old-rot old-center)
   (setvar "BACKGROUNDPLOT" old-bgplot)
-  (setq *error* old-err)
 
   ;; 결과
   (cond
-    (fallback-p
+    ((vl-catch-all-error-p result)
+     (setq result-msg (vl-catch-all-error-message result))
+     (if (not (wcmatch (strcase result-msg) "*CANCEL*,*QUIT*,*EXIT*"))
+       (progn
+         (princ (strcat "\n    ActiveX 오류: "
+                  result-msg
+                  " → -PLOT 폴백"))
+         (edwf:plot-command pt-min pt-max filepath plotter))
+       nil))
+    ((eq result 'fallback)
      (edwf:plot-command pt-min pt-max filepath plotter))
     ((findfile filepath)
      (princ " OK") T)
     (T
      (princ " FAIL") nil)))
 
-;;; ── 레이아웃 복원 헬퍼 ──────────────────────────────────────
 (defun edwf:restore-layout (layout cfg paper ctb ptype ustd scale rot center)
   (if (and cfg    (not (vl-catch-all-error-p cfg)))
     (vl-catch-all-apply 'vla-put-ConfigName       (list layout cfg)))
@@ -630,7 +782,7 @@
 (defun edwf:run-export (doc / borders sorted layout
                               cnt ok-cnt fail-cnt
                               pt-min pt-max fpath result
-                              folder prefix plotter ext)
+                              folder prefix plotter ext plot-window)
   (setq borders (edwf:detect doc))
 
   (if (or (null borders) (= (length borders) 0))
@@ -651,9 +803,11 @@
             fail-cnt 0)
 
       (foreach bd sorted
+        ;; 매 루프마다 layout 객체 갱신
         (setq layout (vla-get-activelayout doc))
-        (setq pt-min (car  bd)
-              pt-max (cadr bd)
+        (setq plot-window (edwf:get-output-window bd)
+              pt-min (car  plot-window)
+              pt-max (cadr plot-window)
               fpath  (strcat folder "\\" prefix (itoa cnt) ext))
         (princ (strcat "\n  [" (itoa cnt) "/"
                        (itoa (length sorted)) "] "
@@ -701,6 +855,11 @@
      (edwf:s "format" "DWF")
      (edwf:s "plotter" "DWF6 ePlot.pc3")
      (edwf:s "ext" ".dwf")))
+
+  (initget "Border Content")
+  (if (= (getkword "\n출력 범위 [Border/Content] <Border>: ") "Content")
+    (edwf:s "crop-mode" "content")
+    (edwf:s "crop-mode" "border"))
 
   (setq folder
     (getstring T (strcat "\n폴더 [" (edwf:g "folder") "]: ")))

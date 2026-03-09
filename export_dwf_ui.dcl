@@ -70,6 +70,14 @@ export_dwf_dialog : dialog {
       : edit_box { key = "ed_minsize"; edit_width = 10; value = "500"; }
       : text     { label = "  (이하 무시, 도면 단위)"; }
     }
+    : row {
+      : text       { label = "출력 범위:"; width = 10; }
+      : popup_list { key = "cb_crop_mode"; width = 22; }
+      : text       { label = "  (테두리 / 내용 크롭)"; }
+    }
+    : text {
+      label = "  * 내용 크롭은 블록/내부 객체 bbox를 우선 사용, 실패 시 테두리 기준";
+    }
   }
 
   // ── 플롯 옵션 ──
