@@ -149,29 +149,25 @@
 ;;; 섹션 6: 플롯 정보 취득 (용지, CTB)
 ;;; ============================================================
 
-(defun edwf:get-papers (plotter / acad doc layout old-cfg result lst)
-  (setq acad   (vlax-get-acad-object)
-        doc    (vla-get-activedocument acad)
-        layout (vla-get-activelayout doc))
+(defun edwf:get-papers (plotter layout / old-cfg result lst err)
   (setq old-cfg (vl-catch-all-apply 'vla-get-ConfigName (list layout)))
-  (vl-catch-all-apply 'vla-put-ConfigName (list layout plotter))
-  (vl-catch-all-apply 'vla-RefreshPlotDeviceInfo (list layout))
-  (setq result (vl-catch-all-apply 'vla-GetCanonicalMediaNames (list layout)))
-  (if (not (vl-catch-all-error-p result))
-    (setq lst (vlax-safearray->list (vlax-variant-value result))))
+  (setq err (vl-catch-all-apply 'vla-put-ConfigName (list layout plotter)))
+  (if (not (vl-catch-all-error-p err))
+    (progn
+      (vl-catch-all-apply 'vla-RefreshPlotDeviceInfo (list layout))
+      (setq result (vl-catch-all-apply 'vla-GetCanonicalMediaNames (list layout)))
+      (if (not (vl-catch-all-error-p result))
+        (setq lst (vlax-safearray->list (vlax-variant-value result))))))
   (if (not (vl-catch-all-error-p old-cfg))
     (vl-catch-all-apply 'vla-put-ConfigName (list layout old-cfg)))
   (if lst (vl-sort lst '<) nil))
 
-(defun edwf:get-ctbs (/ acad doc layout result lst)
-  (setq acad (vlax-get-acad-object)
-        doc  (vla-get-activedocument acad)
-        layout (vla-get-activelayout doc))
+(defun edwf:get-ctbs (layout / result lst)
   (vl-catch-all-apply 'vla-RefreshPlotDeviceInfo (list layout))
   (setq result (vl-catch-all-apply 'vla-GetPlotStyleTableNames (list layout)))
   (if (not (vl-catch-all-error-p result))
     (setq lst (vlax-safearray->list (vlax-variant-value result))))
-  (if lst (vl-sort (vl-remove-if (function (lambda (x) (= x ""))) lst) '<) nil))
+  (if lst (vl-sort (vl-remove-if '(lambda (x) (= x "")) lst) '<) nil))
 
 ;;; ============================================================
 ;;; 섹션 7: 다이얼로그
@@ -217,16 +213,22 @@
   (edwf:update-paper-list (edwf:g "plotter"))
   (edwf:update-ctb-list))
 
-(defun edwf:update-paper-list (plotter)
-  (setq *edwf:paper-list* (edwf:get-papers plotter))
+(defun edwf:update-paper-list (plotter / acad doc layout)
+  (setq acad   (vlax-get-acad-object)
+        doc    (vla-get-activedocument acad)
+        layout (vla-get-activelayout doc))
+  (setq *edwf:paper-list* (edwf:get-papers plotter layout))
   (start_list "cb_paper")
   (add_list "- 직접 입력 -")
   (foreach p *edwf:paper-list* (add_list p))
   (end_list)
   (set_tile "cb_paper" "0"))
 
-(defun edwf:update-ctb-list ()
-  (setq *edwf:ctb-list* (edwf:get-ctbs))
+(defun edwf:update-ctb-list ( / acad doc layout)
+  (setq acad   (vlax-get-acad-object)
+        doc    (vla-get-activedocument acad)
+        layout (vla-get-activelayout doc))
+  (setq *edwf:ctb-list* (edwf:get-ctbs layout))
   (start_list "cb_ctb")
   (add_list "- 직접 입력 -")
   (add_list "- 없음 -")
@@ -644,12 +646,12 @@
 
       (edwf:ensure-dir folder)
 
-      (setq layout   (vla-get-activelayout doc)
-            cnt      1
+      (setq cnt      1
             ok-cnt   0
             fail-cnt 0)
 
       (foreach bd sorted
+        (setq layout (vla-get-activelayout doc))
         (setq pt-min (car  bd)
               pt-max (cadr bd)
               fpath  (strcat folder "\\" prefix (itoa cnt) ext))
