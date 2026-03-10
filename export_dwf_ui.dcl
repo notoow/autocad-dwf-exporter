@@ -1,11 +1,11 @@
 // ============================================================
 // export_dwf_ui.dcl  v5
-// DWF/PDF 일괄 내보내기 설정 다이얼로그
+// DXF/PDF/DWF 일괄 내보내기 설정 다이얼로그
 // AutoCAD 2015 이상 호환
 // ============================================================
 
 export_dwf_dialog : dialog {
-  label = "DWF/PDF 일괄 내보내기  v5";
+  label = "DXF/PDF/DWF 일괄 내보내기  v5";
   initial_focus = "btn_pick";
 
   // ── 감지 방식 ──
@@ -46,10 +46,12 @@ export_dwf_dialog : dialog {
   // ── 출력 형식 ──
   : boxed_column {
     label = "출력 형식";
-    : radio_row {
-      : radio_button { key = "rb_dwf"; label = "DWF  (DWF6 ePlot.pc3)"; value = "1"; }
-      : radio_button { key = "rb_pdf"; label = "PDF  (DWG To PDF.pc3)"; value = "0"; }
-      : radio_button { key = "rb_both"; label = "PDF + DWF"; value = "0"; }
+    : row {
+      : text       { label = "형식:"; width = 10; }
+      : popup_list { key = "cb_format"; width = 30; }
+    }
+    : text {
+      label = "  * 기본은 DXF / 복수 형식은 한 번에 순차 생성";
     }
   }
 
@@ -64,7 +66,7 @@ export_dwf_dialog : dialog {
     : row {
       : text     { label = "파일 접두사:"; width = 12; }
       : edit_box { key = "ed_prefix";  edit_width = 16; value = "도면"; }
-      : text     { label = "  (도면1.dwf / 도면1.pdf ...)"; }
+      : text     { label = "  (도면1.dxf / 도면1.pdf / 도면1.dwf ...)"; }
     }
     : row {
       : text     { label = "최소 크기:"; width = 10; }
@@ -89,13 +91,13 @@ export_dwf_dialog : dialog {
       : popup_list { key = "cb_paper"; width = 30; }
       : edit_box   { key = "ed_paper"; edit_width = 16; value = "자동"; }
     }
-    : text         { label = "  * 기본은 자동 맞춤 / 특수·사용자정의 용지는 정확한 용지명을 직접 입력"; }
+    : text         { label = "  * DXF 전용일 때는 사용 안 함 / PDF·DWF 포함 시 자동 맞춤 또는 정확한 용지명 입력"; }
     : row {
       : text       { label = "플롯 스타일:"; width = 10; }
       : popup_list { key = "cb_ctb"; width = 30; }
       : edit_box   { key = "ed_ctb"; edit_width = 16; value = "none"; }
     }
-    : text         { label = "  * 기본은 none / 필요 시 정확한 스타일명을 직접 입력 (예: monochrome.ctb)"; }
+    : text         { label = "  * DXF 전용일 때는 사용 안 함 / PDF·DWF 포함 시 정확한 스타일명 입력 가능"; }
   }
 
   // ── 미리보기 ──

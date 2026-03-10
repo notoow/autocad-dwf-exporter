@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AutoCAD PDF/DWF Batch Exporter | AutoLISP Sheet Export</title>
+    <title>AutoCAD DXF/PDF/DWF Batch Exporter | AutoLISP Sheet Export</title>
     <meta
       name="description"
-      content="AutoCAD PDF 일괄 출력, DWF 일괄 내보내기, batch plot, sheet export를 위한 AutoLISP 도구. 모델 공간 테두리 감지, 자동 용지 맞춤, PDF+DWF 동시 출력 지원."
+      content="AutoCAD DXF 일괄 추출, PDF 일괄 출력, DWF 내보내기, batch plot, sheet export를 위한 AutoLISP 도구. 모델 공간 테두리 감지, DXF 기본 출력, 자동 용지 맞춤, 다중 형식 동시 저장 지원."
     />
     <meta
       name="keywords"
-      content="AutoCAD PDF 일괄 출력, AutoCAD DWF export, AutoCAD batch plot, AutoCAD sheet export, AutoLISP PDF export, AutoCAD 도면 낱장 출력"
+      content="AutoCAD DXF export, AutoCAD PDF 일괄 출력, AutoCAD DWF export, AutoCAD batch plot, AutoCAD sheet export, AutoCAD Blender DXF, AutoCAD 도면 낱장 저장"
     />
     <meta name="theme-color" content="#101314" />
     <meta name="robots" content="index,follow,max-image-preview:large" />
@@ -19,10 +19,10 @@
     <link rel="manifest" href="./site.webmanifest" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="AutoCAD Sheet Exporter" />
-    <meta property="og:title" content="AutoCAD PDF/DWF Batch Exporter" />
+    <meta property="og:title" content="AutoCAD DXF/PDF/DWF Batch Exporter" />
     <meta
       property="og:description"
-      content="모델 공간 테두리를 감지해 PDF, DWF, 또는 PDF+DWF로 낱장 출력하는 AutoLISP 배치 내보내기 도구."
+      content="모델 공간 테두리를 감지해 DXF, PDF, DWF를 낱장 단위로 저장하는 AutoLISP 배치 내보내기 도구."
     />
     <meta property="og:url" content="https://notoow.github.io/autocad-dwf-exporter/" />
     <meta
@@ -32,10 +32,10 @@
     <meta property="og:image:width" content="1280" />
     <meta property="og:image:height" content="640" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="AutoCAD PDF/DWF Batch Exporter" />
+    <meta name="twitter:title" content="AutoCAD DXF/PDF/DWF Batch Exporter" />
     <meta
       name="twitter:description"
-      content="AutoCAD PDF 일괄 출력, DWF export, batch plot, sheet export를 위한 AutoLISP Pages 랜딩 페이지."
+      content="AutoCAD DXF export, PDF batch export, DWF export, batch plot, sheet export를 위한 AutoLISP Pages 랜딩 페이지."
     />
     <meta
       name="twitter:image"
@@ -53,18 +53,21 @@
         "@context": "https://schema.org",
         "@type": "SoftwareSourceCode",
         "name": "AutoCAD Sheet Exporter",
-        "description": "AutoCAD PDF/DWF batch exporter for model-space sheet borders with auto-fit paper selection, crop modes, preview counts, and PDF+DWF dual export.",
+        "description": "AutoCAD DXF/PDF/DWF batch exporter for model-space sheet borders with DXF-first workflow, auto-fit paper selection, crop modes, and multi-format export.",
         "codeRepository": "https://github.com/notoow/autocad-dwf-exporter",
         "programmingLanguage": "AutoLISP",
         "runtimePlatform": "AutoCAD 2015-2025",
         "license": "https://github.com/notoow/autocad-dwf-exporter/blob/main/LICENSE",
         "keywords": [
+          "AutoCAD DXF batch export",
+          "AutoCAD DXF export",
+          "AutoCAD Blender DXF",
           "AutoCAD PDF batch export",
           "AutoCAD DWF export",
           "AutoCAD batch plot",
           "AutoCAD sheet export",
-          "AutoLISP PDF export",
-          "AutoCAD 도면 낱장 출력"
+          "AutoLISP DXF export",
+          "AutoCAD 도면 낱장 저장"
         ],
         "author": {
           "@type": "Person",
@@ -83,7 +86,7 @@
         <span class="brand-mark">AE</span>
         <span class="brand-copy">
           <strong>AutoCAD Sheet Exporter</strong>
-          <small>PDF / DWF / AutoLISP</small>
+          <small>DXF / PDF / DWF / AutoLISP</small>
         </span>
       </a>
       <nav class="nav">
@@ -97,13 +100,14 @@
     <main id="top">
       <section class="hero shell reveal">
         <div class="hero-copy">
-          <p class="eyebrow">AutoCAD PDF Batch Export · DWF Export · Sheet Plot</p>
+          <p class="eyebrow">AutoCAD DXF Export · PDF Plot · DWF Export</p>
           <h1>모델 공간 테두리를 감지해, 낱장 단위로 더 빠르게 뽑습니다.</h1>
           <p class="lede">
-            AutoCAD에서 <strong>PDF 일괄 출력</strong>, <strong>DWF 일괄 내보내기</strong>,
-            <strong>batch plot</strong>, <strong>sheet export</strong>가 필요할 때 쓰는
-            AutoLISP 도구입니다. 자동 용지 맞춤, 내용 크롭, 샘플 선택 후 감지 개수 미리보기,
-            그리고 <strong>PDF + DWF 동시 출력</strong>까지 지원합니다.
+            AutoCAD에서 <strong>DXF 일괄 추출</strong>, <strong>PDF 일괄 출력</strong>,
+            <strong>DWF 내보내기</strong>, <strong>sheet export</strong>가 필요할 때 쓰는
+            AutoLISP 도구입니다. 기본 출력은 <strong>DXF</strong>이고, 자동 용지 맞춤,
+            내용 크롭, 샘플 선택 후 감지 개수 미리보기, 그리고
+            <strong>DXF + PDF + DWF</strong> 다중 출력까지 지원합니다.
           </p>
           <div class="cta-row">
             <a class="button button-primary" href="https://github.com/notoow/autocad-dwf-exporter">
@@ -113,9 +117,10 @@
           </div>
           <ul class="signal-row">
             <li>AutoCAD 2015-2025</li>
+            <li>DXF Default</li>
             <li>INSERT + LWPOLYLINE</li>
             <li>Auto Fit Paper</li>
-            <li>PDF + DWF</li>
+            <li>Blender Friendly</li>
           </ul>
         </div>
 
@@ -125,10 +130,10 @@
               <span class="pill pill-green">EXPORT-SMART</span>
               <span class="pill pill-soft">2026 Landing</span>
             </div>
-            <h2>Auto-fit paper selection with per-sheet export</h2>
+            <h2>DXF-first export with per-sheet output</h2>
             <p>
-              방향이 아니라 결과를 맞춥니다. 시트 크기 기준으로 가장 가까운 용지를 잡고,
-              PDF 또는 DWF를 낱장으로 정리합니다.
+              DXF가 먼저고 PDF/DWF는 필요할 때 더합니다. 시트 크기 기준으로 가장 가까운
+              용지를 잡고, 형식별 낱장 파일을 순차 생성합니다.
             </p>
             <div class="eq-bars" aria-hidden="true">
               <span></span><span></span><span></span><span></span><span></span>
@@ -149,8 +154,8 @@
 
           <article class="glass-panel panel-card panel-card-c">
             <span class="chip">Output</span>
-            <strong>PDF + DWF in one run</strong>
-            <p>시트마다 두 형식을 순차 생성해 배포와 검토를 한 번에.</p>
+            <strong>DXF + PDF + DWF</strong>
+            <p>시트마다 필요한 확장자를 순차 생성해 제작과 검토를 한 번에.</p>
           </article>
         </div>
       </section>
@@ -163,13 +168,13 @@
         <div class="card-grid">
           <article class="feature-card">
             <span class="feature-index">01</span>
-            <h3>AutoCAD PDF 일괄 출력</h3>
-            <p>모델 공간 테두리를 감지해 시트마다 개별 PDF를 저장합니다.</p>
+            <h3>AutoCAD DXF 일괄 추출</h3>
+            <p>모델 공간 테두리를 감지해 시트마다 개별 DXF를 바로 저장합니다.</p>
           </article>
           <article class="feature-card">
             <span class="feature-index">02</span>
-            <h3>DWF export + dual export</h3>
-            <p>DWF만, PDF만, 또는 PDF+DWF 둘 다 한 번에 생성할 수 있습니다.</p>
+            <h3>Multi-format output</h3>
+            <p>DXF, PDF, DWF를 단독 또는 조합으로 한 번에 생성할 수 있습니다.</p>
           </article>
           <article class="feature-card">
             <span class="feature-index">03</span>
@@ -188,8 +193,8 @@
           </article>
           <article class="feature-card">
             <span class="feature-index">06</span>
-            <h3>ActiveX with fallback</h3>
-            <p>AutoCAD 2016+에서는 ActiveX, 실패 시 -PLOT 폴백으로 배치가 끊기지 않게 설계했습니다.</p>
+            <h3>DXF + plot hybrid engine</h3>
+            <p>DXF는 WBLOCK + SaveAs, PDF/DWF는 ActiveX와 -PLOT 폴백으로 처리합니다.</p>
           </article>
         </div>
       </section>
@@ -218,14 +223,14 @@
             <span>03</span>
             <div>
               <h3>출력 형식 선택</h3>
-              <p><code>DWF</code>, <code>PDF</code>, <code>PDF + DWF</code> 중에서 고릅니다.</p>
+              <p><code>DXF</code>, <code>PDF</code>, <code>DWF</code>, 또는 복수 형식을 고릅니다.</p>
             </div>
           </article>
           <article class="timeline-item">
             <span>04</span>
             <div>
               <h3>자동 용지 맞춤 후 저장</h3>
-              <p>시트 크기에 가장 가까운 용지를 적용하고 낱장 파일로 떨어뜨립니다.</p>
+              <p>DXF는 바로 저장하고, PDF/DWF는 가장 가까운 용지를 적용해 낱장으로 저장합니다.</p>
             </div>
           </article>
         </div>
@@ -237,13 +242,16 @@
           <h2>이런 검색어로 찾는 사용자에게 맞는 페이지입니다.</h2>
         </div>
         <div class="keyword-cloud">
+          <span>AutoCAD DXF 일괄 추출</span>
+          <span>AutoCAD DXF export</span>
+          <span>AutoCAD Blender DXF</span>
+          <span>AutoCAD 낱장 DXF 저장</span>
           <span>AutoCAD PDF 일괄 출력</span>
-          <span>AutoCAD PDF 자동 저장</span>
           <span>AutoCAD DWF export</span>
           <span>AutoCAD batch plot</span>
           <span>AutoCAD sheet export</span>
-          <span>AutoLISP PDF export</span>
-          <span>도면 낱장 출력</span>
+          <span>AutoLISP DXF export</span>
+          <span>도면 낱장 저장</span>
           <span>모델 공간 테두리 감지</span>
           <span>custom paper name</span>
           <span>per-sheet drawing export</span>
@@ -297,7 +305,7 @@
     </main>
 
     <footer class="shell footer">
-      <p>AutoCAD Sheet Exporter · AutoLISP · PDF / DWF Batch Export · GitHub Pages</p>
+      <p>AutoCAD Sheet Exporter · AutoLISP · DXF / PDF / DWF Batch Export · GitHub Pages</p>
     </footer>
   </body>
 </html>

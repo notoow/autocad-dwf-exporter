@@ -2,7 +2,7 @@
 ;;; export_dwf_main.lsp  v5
 ;;;
 ;;; 기능: 모델 공간의 블록참조(INSERT) 또는 폴리라인 테두리를
-;;;       감지하여 각각 DWF 또는 PDF 로 일괄 내보내기
+;;;       감지하여 각각 DXF, PDF 또는 DWF 로 일괄 내보내기
 ;;;
 ;;; 지원: AutoCAD 2015 ~ 2025 (R19 ~ R25), 한/영 모두 동작
 ;;;
@@ -10,11 +10,11 @@
 ;;;   - export_dwf_main.lsp  (이 파일)
 ;;;   - export_dwf_ui.dcl    (다이얼로그)
 ;;;
-;;; ???: APPLOAD ? export_dwf_main.lsp ? ??: EXPORT-SMART
+;;; 사용법: APPLOAD → export_dwf_main.lsp → 명령: EXPORT-SMART
 ;;;
-;;; 플롯 엔진 (버전 자동 선택):
-;;;   R21+(2016~): ActiveX PlotToFile  → 실패 시 -PLOT 자동 폴백
-;;;   R20-(2015) : -PLOT 명령
+;;; 플롯/내보내기 엔진 (버전 자동 선택):
+;;;   R21+(2016~): PDF/DWF는 ActiveX PlotToFile  → 실패 시 -PLOT 자동 폴백
+;;;   R20-(2015) : PDF/DWF는 -PLOT 명령 / DXF는 WBLOCK + SaveAs
 ;;; ============================================================
 
 (vl-load-com)
@@ -34,9 +34,9 @@
       (cons "mode"       "sample")
       (cons "layer"      "")
       (cons "aci"        0)
-      (cons "format"     "DWF")
-      (cons "plotter"    "DWF6 ePlot.pc3")
-      (cons "ext"        ".dwf")
+      (cons "format"     "DXF")
+      (cons "plotter"    "")
+      (cons "ext"        ".dxf")
       (cons "folder"     (if (and fp (/= fp ""))
                            (vl-filename-directory fp)
                            "C:\\Temp"))
@@ -182,25 +182,96 @@
     (vl-sort merged '<)
     nil))
 
+(defun edwf:make-target (name engine plotter ext)
+  (list name engine plotter ext))
+
+(defun edwf:target-name (target)
+  (nth 0 target))
+
+(defun edwf:target-engine (target)
+  (nth 1 target))
+
+(defun edwf:target-plotter (target)
+  (nth 2 target))
+
+(defun edwf:target-ext (target)
+  (nth 3 target))
+
+(defun edwf:plot-target-p (target)
+  (= (edwf:target-engine target) "PLOT"))
+
+(defun edwf:format-options ()
+  (list
+    (list "DXF"    "DXF  (기본)")
+    (list "PDF"    "PDF  (DWG To PDF.pc3)")
+    (list "DWF"    "DWF  (DWF6 ePlot.pc3)")
+    (list "DXFPDF" "DXF + PDF")
+    (list "PDFDWF" "PDF + DWF")
+    (list "DXFDWF" "DXF + DWF")
+    (list "ALL"    "DXF + PDF + DWF")))
+
+(defun edwf:format-index (fmt / idx hit item)
+  (setq fmt (strcase fmt)
+        idx 0
+        hit nil)
+  (foreach item (edwf:format-options)
+    (if (and (null hit) (= fmt (car item)))
+      (setq hit idx))
+    (setq idx (1+ idx)))
+  (if hit hit 0))
+
+(defun edwf:has-plot-targets-p ( / found target)
+  (setq found nil)
+  (foreach target (edwf:format-targets)
+    (if (edwf:plot-target-p target)
+      (setq found T)))
+  found)
+
+(defun edwf:first-plotter ( / plotter target)
+  (setq plotter nil)
+  (foreach target (edwf:format-targets)
+    (if (and (null plotter) (edwf:plot-target-p target))
+      (setq plotter (edwf:target-plotter target))))
+  plotter)
+
 (defun edwf:format-targets ( / fmt)
   (setq fmt (strcase (edwf:g "format")))
   (cond
     ((= fmt "PDF")
-     (list (list "PDF" "DWG To PDF.pc3" ".pdf")))
-    ((= fmt "BOTH")
      (list
-       (list "DWF" "DWF6 ePlot.pc3" ".dwf")
-       (list "PDF" "DWG To PDF.pc3" ".pdf")))
+       (edwf:make-target "PDF" "PLOT" "DWG To PDF.pc3" ".pdf")))
+    ((= fmt "DWF")
+     (list
+       (edwf:make-target "DWF" "PLOT" "DWF6 ePlot.pc3" ".dwf")))
+    ((= fmt "DXFPDF")
+     (list
+       (edwf:make-target "DXF" "DXF" "" ".dxf")
+       (edwf:make-target "PDF" "PLOT" "DWG To PDF.pc3" ".pdf")))
+    ((= fmt "PDFDWF")
+     (list
+       (edwf:make-target "PDF" "PLOT" "DWG To PDF.pc3" ".pdf")
+       (edwf:make-target "DWF" "PLOT" "DWF6 ePlot.pc3" ".dwf")))
+    ((= fmt "DXFDWF")
+     (list
+       (edwf:make-target "DXF" "DXF" "" ".dxf")
+       (edwf:make-target "DWF" "PLOT" "DWF6 ePlot.pc3" ".dwf")))
+    ((= fmt "ALL")
+     (list
+       (edwf:make-target "DXF" "DXF" "" ".dxf")
+       (edwf:make-target "PDF" "PLOT" "DWG To PDF.pc3" ".pdf")
+       (edwf:make-target "DWF" "PLOT" "DWF6 ePlot.pc3" ".dwf")))
     (T
-     (list (list "DWF" "DWF6 ePlot.pc3" ".dwf")))))
+     (list
+       (edwf:make-target "DXF" "DXF" "" ".dxf")))))
 
-(defun edwf:ui-paper-list (layout / papers)
+(defun edwf:ui-paper-list (layout / papers target)
   (setq papers nil)
   (foreach target (edwf:format-targets)
-    (setq papers
-      (edwf:merge-ci-lists
-        papers
-        (edwf:get-papers-cached (cadr target) layout))))
+    (if (edwf:plot-target-p target)
+      (setq papers
+        (edwf:merge-ci-lists
+          papers
+          (edwf:get-papers-cached (edwf:target-plotter target) layout)))))
   papers)
 
 (defun edwf:resolve-auto-paper (plotter layout pt-min pt-max
@@ -253,26 +324,27 @@
         height (abs (- (cadr pt-max) (cadr pt-min))))
   (if (> width height) "_Landscape" "_Portrait"))
 
-(defun edwf:apply-format (fmt)
-  (cond
-    ((= fmt "PDF")
-     (edwf:s "format"  "PDF")
-     (edwf:s "plotter" "DWG To PDF.pc3")
-     (edwf:s "ext"     ".pdf"))
-    ((= fmt "BOTH")
-     (edwf:s "format"  "BOTH")
-     (edwf:s "plotter" "DWF6 ePlot.pc3")
-     (edwf:s "ext"     ".dwf"))
-    (T
-     (edwf:s "format"  "DWF")
-     (edwf:s "plotter" "DWF6 ePlot.pc3")
-     (edwf:s "ext"     ".dwf")))
+(defun edwf:apply-format (fmt / targets plotter ext)
+  (edwf:s "format" (strcase fmt))
+  (setq targets (edwf:format-targets)
+        plotter (edwf:first-plotter)
+        ext     (if targets (edwf:target-ext (car targets)) ".dxf"))
+  (edwf:s "plotter" (if plotter plotter ""))
+  (edwf:s "ext" ext)
   (edwf:s "paper" "AUTO"))
+
+(defun edwf:set-format-by-index (idx / opt)
+  (setq opt (nth idx (edwf:format-options)))
+  (if opt
+    (edwf:set-format (car opt))))
 
 (defun edwf:set-format (fmt)
   (edwf:apply-format fmt)
   (set_tile "ed_paper" "자동")
-  (edwf:update-paper-list (edwf:g "plotter")))
+  (set_tile "ed_ctb" (edwf:ctb-display (edwf:g "ctb")))
+  (edwf:update-paper-list (edwf:g "plotter"))
+  (edwf:update-ctb-list)
+  (edwf:update-plot-option-modes))
 
 ;;; ============================================================
 ;;; 섹션 2: AutoCAD 버전 감지
@@ -314,12 +386,12 @@
   (edwf:init doc)
 
   (princ "\n================================================")
-  (princ "\n  DWF/PDF 일괄 내보내기  v5")
+  (princ "\n  DXF/PDF/DWF 일괄 내보내기  v5")
   (princ (strcat "\n  AutoCAD R" (itoa (edwf:acad-ver))))
   (princ (strcat "\n  엔진: "
     (if (>= (edwf:acad-ver) 21)
-      "ActiveX (+ -PLOT 폴백)"
-      "-PLOT 명령")))
+      "PDF/DWF는 ActiveX (+ -PLOT 폴백) / DXF는 WBLOCK + SaveAs"
+      "PDF/DWF는 -PLOT / DXF는 WBLOCK + SaveAs")))
   (princ "\n================================================")
 
   (setq dcl-file (edwf:find-dcl))
@@ -431,9 +503,6 @@
 (defun edwf:dlg-init ()
   (set_tile "rb_sample"  (if (= (edwf:g "mode") "layer") "0" "1"))
   (set_tile "rb_layer"   (if (= (edwf:g "mode") "layer") "1" "0"))
-  (set_tile "rb_dwf"     (if (= (edwf:g "format") "DWF") "1" "0"))
-  (set_tile "rb_pdf"     (if (= (edwf:g "format") "PDF") "1" "0"))
-  (set_tile "rb_both"    (if (= (edwf:g "format") "BOTH") "1" "0"))
   (set_tile "ed_layer"   (if (edwf:g "layer") (edwf:g "layer") ""))
   (set_tile "ed_aci"     (if (> (edwf:g "aci") 0)
                            (itoa (edwf:g "aci")) ""))
@@ -443,10 +512,26 @@
   (set_tile "ed_ctb"     (edwf:ctb-display (edwf:g "ctb")))
   (set_tile "ed_minsize" (itoa (edwf:g "minsize")))
   (set_tile "txt_count"  "감지된 개수: -")
-  
+
+  (edwf:update-format-list)
   (edwf:update-crop-mode-list)
   (edwf:update-paper-list (edwf:g "plotter"))
-  (edwf:update-ctb-list))
+  (edwf:update-ctb-list)
+  (edwf:update-plot-option-modes))
+
+(defun edwf:update-format-list ( / opt)
+  (start_list "cb_format")
+  (foreach opt (edwf:format-options)
+    (add_list (cadr opt)))
+  (end_list)
+  (set_tile "cb_format" (itoa (edwf:format-index (edwf:g "format")))))
+
+(defun edwf:update-plot-option-modes ( / mode)
+  (setq mode (if (edwf:has-plot-targets-p) 0 1))
+  (mode_tile "cb_paper" mode)
+  (mode_tile "ed_paper" mode)
+  (mode_tile "cb_ctb" mode)
+  (mode_tile "ed_ctb" mode))
 
 (defun edwf:update-crop-mode-list ()
   (start_list "cb_crop_mode")
@@ -460,61 +545,88 @@
   (setq acad   (vlax-get-acad-object)
         doc    (vla-get-activedocument acad)
         layout (vla-get-activelayout doc))
-  (setq *edwf:paper-list* (edwf:ui-paper-list layout))
-  (start_list "cb_paper")
-  (add_list "- 자동 맞춤 (기본) -")
-  (add_list "- 특수/사용자정의 용지명 -")
-  (foreach p *edwf:paper-list* (add_list p))
-  (end_list)
-  (set_tile "cb_paper"
-    (cond
-      ((edwf:auto-paper-p (edwf:g "paper")) "0")
-      ((edwf:index-ci (edwf:g "paper") *edwf:paper-list*)
-       (itoa (+ 2 (edwf:index-ci (edwf:g "paper") *edwf:paper-list*))))
-      (T "1"))))
+  (if (edwf:has-plot-targets-p)
+    (progn
+      (setq *edwf:paper-list* (edwf:ui-paper-list layout))
+      (start_list "cb_paper")
+      (add_list "- 자동 맞춤 (기본) -")
+      (add_list "- 특수/사용자정의 용지명 -")
+      (foreach p *edwf:paper-list* (add_list p))
+      (end_list)
+      (set_tile "cb_paper"
+        (cond
+          ((edwf:auto-paper-p (edwf:g "paper")) "0")
+          ((edwf:index-ci (edwf:g "paper") *edwf:paper-list*)
+           (itoa (+ 2 (edwf:index-ci (edwf:g "paper") *edwf:paper-list*))))
+          (T "1"))))
+    (progn
+      (setq *edwf:paper-list* nil)
+      (start_list "cb_paper")
+      (add_list "- DXF에서는 사용 안 함 -")
+      (end_list)
+      (set_tile "cb_paper" "0"))))
 
 (defun edwf:update-ctb-list ( / acad doc layout)
   (setq acad   (vlax-get-acad-object)
         doc    (vla-get-activedocument acad)
         layout (vla-get-activelayout doc))
-  (setq *edwf:ctb-list* (edwf:get-ctbs layout))
-  (start_list "cb_ctb")
-  (add_list "- 없음 (기본) -")
-  (add_list "- 스타일명 직접 입력 -")
-  (foreach c *edwf:ctb-list* (add_list c))
-  (end_list)
-  (set_tile "cb_ctb"
-    (cond
-      ((edwf:none-ctb-p (edwf:g "ctb")) "0")
-      ((edwf:index-ci (edwf:g "ctb") *edwf:ctb-list*)
-       (itoa (+ 2 (edwf:index-ci (edwf:g "ctb") *edwf:ctb-list*))))
-      (T "1"))))
+  (if (edwf:has-plot-targets-p)
+    (progn
+      (setq *edwf:ctb-list* (edwf:get-ctbs layout))
+      (start_list "cb_ctb")
+      (add_list "- 없음 (기본) -")
+      (add_list "- 스타일명 직접 입력 -")
+      (foreach c *edwf:ctb-list* (add_list c))
+      (end_list)
+      (set_tile "cb_ctb"
+        (cond
+          ((edwf:none-ctb-p (edwf:g "ctb")) "0")
+          ((edwf:index-ci (edwf:g "ctb") *edwf:ctb-list*)
+           (itoa (+ 2 (edwf:index-ci (edwf:g "ctb") *edwf:ctb-list*))))
+          (T "1"))))
+    (progn
+      (setq *edwf:ctb-list* nil)
+      (start_list "cb_ctb")
+      (add_list "- DXF에서는 사용 안 함 -")
+      (end_list)
+      (set_tile "cb_ctb" "0"))))
+
+(defun edwf:cb-format-action (val)
+  (edwf:set-format-by-index (atoi val)))
 
 (defun edwf:cb-paper-action (val / idx p)
   (setq idx (atoi val))
-  (cond
-    ((= idx 0)
-     (set_tile "ed_paper" "자동")
-     (edwf:s "paper" "AUTO"))
-    ((= idx 1)
-     (set_tile "ed_paper"
-       (if (edwf:auto-paper-p (edwf:g "paper")) "" (edwf:g "paper"))))
-    (T
-     (setq p (nth (- idx 2) *edwf:paper-list*))
-     (set_tile "ed_paper" p)
-     (edwf:s "paper" p))))
+  (if (not (edwf:has-plot-targets-p))
+    (progn
+      (set_tile "ed_paper" "자동")
+      (edwf:s "paper" "AUTO"))
+    (cond
+      ((= idx 0)
+       (set_tile "ed_paper" "자동")
+       (edwf:s "paper" "AUTO"))
+      ((= idx 1)
+       (set_tile "ed_paper"
+         (if (edwf:auto-paper-p (edwf:g "paper")) "" (edwf:g "paper"))))
+      (T
+       (setq p (nth (- idx 2) *edwf:paper-list*))
+       (set_tile "ed_paper" p)
+       (edwf:s "paper" p)))))
 
 (defun edwf:cb-ctb-action (val / idx c)
   (setq idx (atoi val))
-  (cond
-    ((= idx 0) (set_tile "ed_ctb" "none") (edwf:s "ctb" "none"))
-    ((= idx 1)
-     (set_tile "ed_ctb"
-       (if (edwf:none-ctb-p (edwf:g "ctb")) "none" (edwf:g "ctb"))))
-    (T
-      (setq c (nth (- idx 2) *edwf:ctb-list*))
-      (set_tile "ed_ctb" c)
-      (edwf:s "ctb" c))))
+  (if (not (edwf:has-plot-targets-p))
+    (progn
+      (set_tile "ed_ctb" "none")
+      (edwf:s "ctb" "none"))
+    (cond
+      ((= idx 0) (set_tile "ed_ctb" "none") (edwf:s "ctb" "none"))
+      ((= idx 1)
+       (set_tile "ed_ctb"
+         (if (edwf:none-ctb-p (edwf:g "ctb")) "none" (edwf:g "ctb"))))
+      (T
+        (setq c (nth (- idx 2) *edwf:ctb-list*))
+        (set_tile "ed_ctb" c)
+        (edwf:s "ctb" c)))))
 
 (defun edwf:cb-crop-mode-action (val)
   (if (= (atoi val) 1)
@@ -526,9 +638,7 @@
   (action_tile "rb_layer"  "(edwf:s \"mode\" \"layer\")")
   (action_tile "btn_pick"  "(done_dialog 2)")
 
-  (action_tile "rb_dwf"  "(edwf:set-format \"DWF\")")
-  (action_tile "rb_pdf"  "(edwf:set-format \"PDF\")")
-  (action_tile "rb_both" "(edwf:set-format \"BOTH\")")
+  (action_tile "cb_format" "(edwf:cb-format-action $value)")
 
   (action_tile "btn_browse"  "(edwf:browse-folder)")
   (action_tile "btn_preview" "(edwf:dlg-save)(edwf:dlg-preview)")
@@ -1065,21 +1175,117 @@
       (progn (princ " FAIL (프롬프트 불일치 가능)") nil))
     nil))
 
+(defun edwf:dxf-save-type ()
+  (cond
+    ((boundp 'ac2013_dxf) ac2013_dxf)
+    ((boundp 'ac2010_dxf) ac2010_dxf)
+    ((boundp 'ac2007_dxf) ac2007_dxf)
+    ((boundp 'ac2004_dxf) ac2004_dxf)
+    ((boundp 'ac2000_dxf) ac2000_dxf)
+    ((boundp 'acR12_dxf) acR12_dxf)
+    (T nil)))
+
+(defun edwf:delete-file-safe (path)
+  (if (and path (findfile path))
+    (vl-file-delete path)))
+
+(defun edwf:window-objects (pt-min pt-max / ss i ent obj bbox objs)
+  (setq objs nil
+        ss   (ssget "_C" pt-min pt-max (list (cons 410 "Model"))))
+  (if ss
+    (progn
+      (setq i 0)
+      (repeat (sslength ss)
+        (setq ent  (ssname ss i)
+              obj  (vlax-ename->vla-object ent)
+              bbox (edwf:get-bbox-safe obj))
+        (if (and bbox (edwf:bbox-inside-outer-p bbox pt-min pt-max))
+          (setq objs (cons obj objs)))
+        (setq i (1+ i)))))
+  (reverse objs))
+
+(defun edwf:delete-selection-set-safe (doc name / ssets sset)
+  (setq ssets (vla-get-SelectionSets doc)
+        sset  (vl-catch-all-apply 'vla-Item (list ssets name)))
+  (if (not (vl-catch-all-error-p sset))
+    (vl-catch-all-apply 'vla-Delete (list sset))))
+
+(defun edwf:make-selection-set (doc name objs / sset arr idx)
+  (if objs
+    (progn
+      (edwf:delete-selection-set-safe doc name)
+      (setq sset (vla-Add (vla-get-SelectionSets doc) name)
+            arr  (vlax-make-safearray vlax-vbObject (cons 0 (1- (length objs))))
+            idx  0)
+      (foreach obj objs
+        (vlax-safearray-put-element arr idx obj)
+        (setq idx (1+ idx)))
+      (vla-AddItems sset arr)
+      sset)))
+
+(defun edwf:export-dxf (pt-min pt-max filepath doc / objs sset temp-dwg temp-doc docs save-type result)
+  (setq objs      (edwf:window-objects pt-min pt-max)
+        save-type (edwf:dxf-save-type))
+  (cond
+    ((null objs)
+     (princ " FAIL (객체 없음)")
+     nil)
+    ((null save-type)
+     (princ " FAIL (DXF 저장 형식 없음)")
+     nil)
+    (T
+     (setq sset     (edwf:make-selection-set doc "EDWF_TMP_SSET" objs)
+           temp-dwg (vl-filename-mktemp "edwf_sheet_" (edwf:g "folder") ".dwg"))
+     (edwf:delete-file-safe filepath)
+     (setq result (vl-catch-all-apply 'vla-WBlock (list doc temp-dwg sset)))
+     (if sset
+       (vl-catch-all-apply 'vla-Delete (list sset)))
+     (if (vl-catch-all-error-p result)
+       (progn
+         (princ (strcat "\n    DXF WBLOCK 오류: " (vl-catch-all-error-message result)))
+         (edwf:delete-file-safe temp-dwg)
+         nil)
+       (progn
+         (setq docs     (vla-get-Documents (vlax-get-acad-object))
+               temp-doc (vl-catch-all-apply 'vla-Open (list docs temp-dwg)))
+         (if (vl-catch-all-error-p temp-doc)
+           (progn
+             (princ (strcat "\n    DXF 임시도면 열기 오류: " (vl-catch-all-error-message temp-doc)))
+             (edwf:delete-file-safe temp-dwg)
+             nil)
+           (progn
+             (setq result (vl-catch-all-apply 'vla-SaveAs (list temp-doc filepath save-type)))
+             (vl-catch-all-apply 'vla-Close (list temp-doc :vlax-false))
+             (edwf:delete-file-safe temp-dwg)
+             (vla-Activate doc)
+             (if (vl-catch-all-error-p result)
+               (progn
+                 (princ (strcat "\n    DXF 저장 오류: " (vl-catch-all-error-message result)))
+                 nil)
+               (if (findfile filepath)
+                 (progn (princ " OK") T)
+                 (progn (princ " FAIL") nil))))))))))
+
 ;;; ============================================================
 ;;; 섹션 12: 내보내기 실행
 ;;; ============================================================
 
 (defun edwf:run-export-target (doc sheet-idx job-idx total-jobs
                                    pt-min pt-max folder prefix target
-                                   / layout plotter ext fpath)
+                                   / layout engine plotter ext fpath)
   (setq layout  (vla-get-activelayout doc)
-        plotter (cadr target)
-        ext     (caddr target)
+        engine  (edwf:target-engine target)
+        plotter (edwf:target-plotter target)
+        ext     (edwf:target-ext target)
         fpath   (strcat folder "\\" prefix (itoa sheet-idx) ext))
   (princ (strcat "\n  [" (itoa job-idx) "/"
                  (itoa total-jobs) "] "
                  prefix (itoa sheet-idx) ext))
-  (edwf:plot-one pt-min pt-max fpath plotter doc layout))
+  (cond
+    ((= engine "DXF")
+     (edwf:export-dxf pt-min pt-max fpath doc))
+    (T
+     (edwf:plot-one pt-min pt-max fpath plotter doc layout))))
 
 (defun edwf:run-export (doc / borders sorted targets total-jobs
                               sheet-idx job-idx ok-cnt fail-cnt
@@ -1145,15 +1351,16 @@
       (setq tmp-aci (getint "\nACI 번호 (0=전체): "))
       (edwf:s "aci" (if tmp-aci tmp-aci 0))))
 
-  (initget "DWF PDF Both")
-  (setq fmt (getkword "\n형식 [DWF/PDF/Both] <DWF>: "))
+  (initget "DXF PDF DWF DxfPdf PdfDwf DxfDwf All")
+  (setq fmt (getkword "\n형식 [DXF/PDF/DWF/DxfPdf/PdfDwf/DxfDwf/All] <DXF>: "))
   (cond
-    ((= fmt "PDF")
-     (edwf:apply-format "PDF"))
-    ((= fmt "Both")
-     (edwf:apply-format "BOTH"))
-    (T
-     (edwf:apply-format "DWF")))
+    ((= fmt "PDF")    (edwf:apply-format "PDF"))
+    ((= fmt "DWF")    (edwf:apply-format "DWF"))
+    ((= fmt "DxfPdf") (edwf:apply-format "DXFPDF"))
+    ((= fmt "PdfDwf") (edwf:apply-format "PDFDWF"))
+    ((= fmt "DxfDwf") (edwf:apply-format "DXFDWF"))
+    ((= fmt "All")    (edwf:apply-format "ALL"))
+    (T                (edwf:apply-format "DXF")))
 
   (initget "Border Content")
   (if (= (getkword "\n출력 범위 [Border/Content] <Border>: ") "Content")
@@ -1173,8 +1380,8 @@
 (princ (strcat "\n  AutoCAD R" (itoa (edwf:acad-ver))))
 (princ (strcat "\n  엔진: "
   (if (>= (edwf:acad-ver) 21)
-    "ActiveX (실패 시 -PLOT 자동 폴백)"
-    "-PLOT 명령")))
+    "PDF/DWF는 ActiveX (실패 시 -PLOT 자동 폴백) / DXF는 WBLOCK + SaveAs"
+    "PDF/DWF는 -PLOT / DXF는 WBLOCK + SaveAs")))
 (princ "\n  명령: EXPORT-SMART")
 (princ "\n================================================")
 (princ)
