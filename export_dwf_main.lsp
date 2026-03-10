@@ -345,11 +345,6 @@
 (defun c:EXPORT-SMART ()
   (edwf:main-command))
 
-(defun c:EXPORT-SHEETS ()
-  (edwf:main-command))
-
-(defun c:EXPORT-DWF ()
-  (edwf:main-command))
 
 ;;; ============================================================
 ;;; 섹션 5: DCL 파일 탐색
@@ -1180,6 +1175,6 @@
   (if (>= (edwf:acad-ver) 21)
     "ActiveX (실패 시 -PLOT 자동 폴백)"
     "-PLOT 명령")))
-(princ "\n  ??: EXPORT-SMART  (??: EXPORT-SHEETS, EXPORT-DWF)")
+(princ "\n  명령: EXPORT-SMART")
 (princ "\n================================================")
 (princ)
