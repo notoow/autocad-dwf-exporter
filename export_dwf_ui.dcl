@@ -55,6 +55,22 @@ export_dwf_dialog : dialog {
     }
   }
 
+  : boxed_column {
+    label = "DXF 옵션";
+    : row {
+      : text       { label = "DXF 버전:"; width = 10; }
+      : popup_list { key = "cb_dxf_version"; width = 30; }
+    }
+    : toggle {
+      key   = "chk_explode";
+      label = "블록 분해 (Blender 권장)";
+      value = "1";
+    }
+    : text {
+      label = "  * R2000 + 블록 분해 권장 / 단위는 Blender 가져오기에서 확인";
+    }
+  }
+
   // ── 출력 설정 ──
   : boxed_column {
     label = "출력 설정";

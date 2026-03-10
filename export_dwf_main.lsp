@@ -43,6 +43,8 @@
       (cons "prefix"     "도면")
       (cons "paper"      "AUTO")
       (cons "ctb"        "none")
+      (cons "dxf-version" "R2000")
+      (cons "explode-blk" T)
       (cons "crop-mode"  "border")
       (cons "minsize"    500)
       (cons "sample-lyr" nil)
@@ -227,6 +229,29 @@
       (setq found T)))
   found)
 
+(defun edwf:has-dxf-targets-p ( / found target)
+  (setq found nil)
+  (foreach target (edwf:format-targets)
+    (if (= (edwf:target-engine target) "DXF")
+      (setq found T)))
+  found)
+
+(defun edwf:dxf-version-options ()
+  (list
+    (list "R2000" "Blender 권장 (R2000)")
+    (list "R2013" "CAD 권장 (R2013)")
+    (list "R12"   "구형 호환 (R12)")))
+
+(defun edwf:dxf-version-index (version / idx hit opt)
+  (setq version (strcase version)
+        idx     0
+        hit     nil)
+  (foreach opt (edwf:dxf-version-options)
+    (if (and (null hit) (= version (car opt)))
+      (setq hit idx))
+    (setq idx (1+ idx)))
+  (if hit hit 0))
+
 (defun edwf:first-plotter ( / plotter target)
   (setq plotter nil)
   (foreach target (edwf:format-targets)
@@ -344,7 +369,8 @@
   (set_tile "ed_ctb" (edwf:ctb-display (edwf:g "ctb")))
   (edwf:update-paper-list (edwf:g "plotter"))
   (edwf:update-ctb-list)
-  (edwf:update-plot-option-modes))
+  (edwf:update-plot-option-modes)
+  (edwf:update-dxf-option-modes))
 
 ;;; ============================================================
 ;;; 섹션 2: AutoCAD 버전 감지
@@ -510,14 +536,17 @@
   (set_tile "ed_prefix"  (edwf:g "prefix"))
   (set_tile "ed_paper"   (edwf:paper-display (edwf:g "paper")))
   (set_tile "ed_ctb"     (edwf:ctb-display (edwf:g "ctb")))
+  (set_tile "chk_explode" (if (edwf:g "explode-blk") "1" "0"))
   (set_tile "ed_minsize" (itoa (edwf:g "minsize")))
   (set_tile "txt_count"  "감지된 개수: -")
 
   (edwf:update-format-list)
+  (edwf:update-dxf-version-list)
   (edwf:update-crop-mode-list)
   (edwf:update-paper-list (edwf:g "plotter"))
   (edwf:update-ctb-list)
-  (edwf:update-plot-option-modes))
+  (edwf:update-plot-option-modes)
+  (edwf:update-dxf-option-modes))
 
 (defun edwf:update-format-list ( / opt)
   (start_list "cb_format")
@@ -526,12 +555,25 @@
   (end_list)
   (set_tile "cb_format" (itoa (edwf:format-index (edwf:g "format")))))
 
+(defun edwf:update-dxf-version-list ( / opt)
+  (start_list "cb_dxf_version")
+  (foreach opt (edwf:dxf-version-options)
+    (add_list (cadr opt)))
+  (end_list)
+  (set_tile "cb_dxf_version"
+    (itoa (edwf:dxf-version-index (edwf:g "dxf-version")))))
+
 (defun edwf:update-plot-option-modes ( / mode)
   (setq mode (if (edwf:has-plot-targets-p) 0 1))
   (mode_tile "cb_paper" mode)
   (mode_tile "ed_paper" mode)
   (mode_tile "cb_ctb" mode)
   (mode_tile "ed_ctb" mode))
+
+(defun edwf:update-dxf-option-modes ( / mode)
+  (setq mode (if (edwf:has-dxf-targets-p) 0 1))
+  (mode_tile "cb_dxf_version" mode)
+  (mode_tile "chk_explode" mode))
 
 (defun edwf:update-crop-mode-list ()
   (start_list "cb_crop_mode")
@@ -594,6 +636,14 @@
 (defun edwf:cb-format-action (val)
   (edwf:set-format-by-index (atoi val)))
 
+(defun edwf:cb-dxf-version-action (val / opt)
+  (setq opt (nth (atoi val) (edwf:dxf-version-options)))
+  (if opt
+    (edwf:s "dxf-version" (car opt))))
+
+(defun edwf:cb-explode-action (val)
+  (edwf:s "explode-blk" (= val "1")))
+
 (defun edwf:cb-paper-action (val / idx p)
   (setq idx (atoi val))
   (if (not (edwf:has-plot-targets-p))
@@ -639,6 +689,8 @@
   (action_tile "btn_pick"  "(done_dialog 2)")
 
   (action_tile "cb_format" "(edwf:cb-format-action $value)")
+  (action_tile "cb_dxf_version" "(edwf:cb-dxf-version-action $value)")
+  (action_tile "chk_explode" "(edwf:cb-explode-action $value)")
 
   (action_tile "btn_browse"  "(edwf:browse-folder)")
   (action_tile "btn_preview" "(edwf:dlg-save)(edwf:dlg-preview)")
@@ -659,7 +711,7 @@
   (action_tile "accept" "(edwf:dlg-save)(done_dialog 1)")
   (action_tile "cancel" "(done_dialog 0)"))
 
-(defun edwf:dlg-save ( / tmp-min tmp-aci)
+(defun edwf:dlg-save ( / tmp-min tmp-aci opt)
   (edwf:s "layer"  (get_tile "ed_layer"))
   (edwf:s "folder" (get_tile "ed_folder"))
   (edwf:s "prefix" (get_tile "ed_prefix"))
@@ -669,6 +721,10 @@
     (if (edwf:none-ctb-p (get_tile "ed_ctb")) "none" (edwf:trim (get_tile "ed_ctb"))))
   (edwf:s "crop-mode"
     (if (= (get_tile "cb_crop_mode") "1") "content" "border"))
+  (setq opt (nth (atoi (get_tile "cb_dxf_version")) (edwf:dxf-version-options)))
+  (if opt
+    (edwf:s "dxf-version" (car opt)))
+  (edwf:s "explode-blk" (= (get_tile "chk_explode") "1"))
   (setq tmp-min (atoi (get_tile "ed_minsize")))
   (edwf:s "minsize" (if (> tmp-min 0) tmp-min 500))
   (setq tmp-aci (get_tile "ed_aci"))
@@ -1175,21 +1231,42 @@
       (progn (princ " FAIL (프롬프트 불일치 가능)") nil))
     nil))
 
-(defun edwf:dxf-save-type ()
+(defun edwf:dxf-save-type ( / version)
+  (setq version (strcase (edwf:g "dxf-version")))
   (cond
-    ((boundp 'ac2013_dxf) ac2013_dxf)
-    ((boundp 'ac2010_dxf) ac2010_dxf)
-    ((boundp 'ac2007_dxf) ac2007_dxf)
-    ((boundp 'ac2004_dxf) ac2004_dxf)
-    ((boundp 'ac2000_dxf) ac2000_dxf)
-    ((boundp 'acR12_dxf) acR12_dxf)
-    (T nil)))
+    ((= version "R12")
+     (cond
+       ((boundp 'acR12_dxf) acR12_dxf)
+       ((boundp 'ac2000_dxf) ac2000_dxf)
+       ((boundp 'ac2004_dxf) ac2004_dxf)
+       ((boundp 'ac2007_dxf) ac2007_dxf)
+       ((boundp 'ac2010_dxf) ac2010_dxf)
+       ((boundp 'ac2013_dxf) ac2013_dxf)
+       (T nil)))
+    ((= version "R2013")
+     (cond
+       ((boundp 'ac2013_dxf) ac2013_dxf)
+       ((boundp 'ac2010_dxf) ac2010_dxf)
+       ((boundp 'ac2007_dxf) ac2007_dxf)
+       ((boundp 'ac2004_dxf) ac2004_dxf)
+       ((boundp 'ac2000_dxf) ac2000_dxf)
+       ((boundp 'acR12_dxf) acR12_dxf)
+       (T nil)))
+    (T
+     (cond
+       ((boundp 'ac2000_dxf) ac2000_dxf)
+       ((boundp 'acR12_dxf) acR12_dxf)
+       ((boundp 'ac2004_dxf) ac2004_dxf)
+       ((boundp 'ac2007_dxf) ac2007_dxf)
+       ((boundp 'ac2010_dxf) ac2010_dxf)
+       ((boundp 'ac2013_dxf) ac2013_dxf)
+       (T nil)))))
 
 (defun edwf:delete-file-safe (path)
   (if (and path (findfile path))
     (vl-file-delete path)))
 
-(defun edwf:window-objects (pt-min pt-max / ss i ent obj bbox objs)
+(defun edwf:window-objects (pt-min pt-max border-ent / ss i ent obj bbox objs)
   (setq objs nil
         ss   (ssget "_C" pt-min pt-max (list (cons 410 "Model"))))
   (if ss
@@ -1199,7 +1276,9 @@
         (setq ent  (ssname ss i)
               obj  (vlax-ename->vla-object ent)
               bbox (edwf:get-bbox-safe obj))
-        (if (and bbox (edwf:bbox-inside-outer-p bbox pt-min pt-max))
+        (if (and (/= ent border-ent)
+                 bbox
+                 (edwf:bbox-inside-outer-p bbox pt-min pt-max))
           (setq objs (cons obj objs)))
         (setq i (1+ i)))))
   (reverse objs))
@@ -1223,8 +1302,36 @@
       (vla-AddItems sset arr)
       sset)))
 
-(defun edwf:export-dxf (pt-min pt-max filepath doc / objs sset temp-dwg temp-doc docs save-type result)
-  (setq objs      (edwf:window-objects pt-min pt-max)
+(defun edwf:collect-model-inserts (doc / inserts obj)
+  (setq inserts nil)
+  (vlax-for obj (vla-get-ModelSpace doc)
+    (if (= (vla-get-ObjectName obj) "AcDbBlockReference")
+      (setq inserts (cons obj inserts))))
+  (reverse inserts))
+
+(defun edwf:explode-insert-safe (obj / result)
+  (setq result (vl-catch-all-apply 'vlax-invoke-method (list obj 'Explode)))
+  (if (vl-catch-all-error-p result)
+    nil
+    (progn
+      (edwf:object-list result)
+      (edwf:delete-object-safe obj)
+      T)))
+
+(defun edwf:explode-tempdoc-inserts (doc / pass inserts changed obj)
+  (setq pass 0)
+  (while (< pass 20)
+    (setq inserts (edwf:collect-model-inserts doc)
+          changed nil)
+    (foreach obj inserts
+      (if (edwf:explode-insert-safe obj)
+        (setq changed T)))
+    (if changed
+      (setq pass (1+ pass))
+      (setq pass 20))))
+
+(defun edwf:export-dxf (pt-min pt-max filepath border-ent doc / objs sset temp-dwg temp-doc docs save-type result)
+  (setq objs      (edwf:window-objects pt-min pt-max border-ent)
         save-type (edwf:dxf-save-type))
   (cond
     ((null objs)
@@ -1250,10 +1357,12 @@
                temp-doc (vl-catch-all-apply 'vla-Open (list docs temp-dwg)))
          (if (vl-catch-all-error-p temp-doc)
            (progn
-             (princ (strcat "\n    DXF 임시도면 열기 오류: " (vl-catch-all-error-message temp-doc)))
-             (edwf:delete-file-safe temp-dwg)
-             nil)
+            (princ (strcat "\n    DXF 임시도면 열기 오류: " (vl-catch-all-error-message temp-doc)))
+            (edwf:delete-file-safe temp-dwg)
+            nil)
            (progn
+             (if (edwf:g "explode-blk")
+               (edwf:explode-tempdoc-inserts temp-doc))
              (setq result (vl-catch-all-apply 'vla-SaveAs (list temp-doc filepath save-type)))
              (vl-catch-all-apply 'vla-Close (list temp-doc :vlax-false))
              (edwf:delete-file-safe temp-dwg)
@@ -1271,7 +1380,7 @@
 ;;; ============================================================
 
 (defun edwf:run-export-target (doc sheet-idx job-idx total-jobs
-                                   pt-min pt-max folder prefix target
+                                   pt-min pt-max border-ent folder prefix target
                                    / layout engine plotter ext fpath)
   (setq layout  (vla-get-activelayout doc)
         engine  (edwf:target-engine target)
@@ -1283,11 +1392,12 @@
                  prefix (itoa sheet-idx) ext))
   (cond
     ((= engine "DXF")
-     (edwf:export-dxf pt-min pt-max fpath doc))
+     (edwf:export-dxf pt-min pt-max fpath border-ent doc))
     (T
      (edwf:plot-one pt-min pt-max fpath plotter doc layout))))
 
 (defun edwf:run-export (doc / borders sorted targets total-jobs
+                              bd border-ent
                               sheet-idx job-idx ok-cnt fail-cnt
                               pt-min pt-max result
                               folder prefix plot-window)
@@ -1313,13 +1423,14 @@
 
       (foreach bd sorted
         (setq plot-window (edwf:get-output-window bd)
+              border-ent  (if (> (length bd) 2) (caddr bd) nil)
               pt-min (car  plot-window)
               pt-max (cadr plot-window))
         (foreach target targets
           (setq result
             (edwf:run-export-target
               doc sheet-idx job-idx total-jobs
-              pt-min pt-max folder prefix target))
+              pt-min pt-max border-ent folder prefix target))
           (if result
             (setq ok-cnt (1+ ok-cnt))
             (setq fail-cnt (1+ fail-cnt)))
@@ -1337,7 +1448,7 @@
 ;;; 섹션 13: 텍스트 모드
 ;;; ============================================================
 
-(defun edwf:textmode (doc / mode fmt folder tmp-aci)
+(defun edwf:textmode (doc / mode fmt folder tmp-aci dxf-version explode-opt)
   (princ "\n[텍스트 모드]\n")
 
   (initget "Sample Layer")
@@ -1361,6 +1472,24 @@
     ((= fmt "DxfDwf") (edwf:apply-format "DXFDWF"))
     ((= fmt "All")    (edwf:apply-format "ALL"))
     (T                (edwf:apply-format "DXF")))
+
+  (if (edwf:has-dxf-targets-p)
+    (progn
+      (initget "R2000 R2013 R12")
+      (setq dxf-version
+        (getkword
+          (strcat "\nDXF 버전 [R2000/R2013/R12] <" (edwf:g "dxf-version") ">: ")))
+      (if dxf-version
+        (edwf:s "dxf-version" dxf-version))
+
+      (initget "Yes No")
+      (setq explode-opt
+        (getkword
+          (strcat "\n블록 분해 [Yes/No] <"
+            (if (edwf:g "explode-blk") "Yes" "No")
+            ">: ")))
+      (if explode-opt
+        (edwf:s "explode-blk" (= explode-opt "Yes")))))
 
   (initget "Border Content")
   (if (= (getkword "\n출력 범위 [Border/Content] <Border>: ") "Content")
