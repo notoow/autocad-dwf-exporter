@@ -28,7 +28,7 @@ AutoCAD에서 `PDF 일괄 출력`, `DWF 일괄 내보내기`, `도면 낱장 저
 
 ### 주요 기능
 
-- `EXPORT-SHEETS` 기본 명령, `EXPORT-DWF` 호환 별칭 유지
+- `EXPORT-SMART` ?? ??, `EXPORT-SHEETS` / `EXPORT-DWF` ?? ?? ??
 - `INSERT` + 닫힌 `LWPOLYLINE` 동시 감지
 - 샘플 테두리 1개를 클릭하면 레이어/ACI를 자동 추출
 - 샘플 선택 직후 같은 조건의 감지 개수를 자동 계산해서 미리보기 표시
@@ -67,9 +67,9 @@ AutoCAD에서 `PDF 일괄 출력`, `DWF 일괄 내보내기`, `도면 낱장 저
 1. `export_dwf_main.lsp` 와 `export_dwf_ui.dcl` 을 대상 `.dwg` 와 같은 폴더에 둡니다.
 2. AutoCAD에서 `APPLOAD` 실행
 3. `export_dwf_main.lsp` 로드
-4. 명령행에 `EXPORT-SHEETS` 입력
+4. ???? `EXPORT-SMART` ??
 
-호환용으로 `EXPORT-DWF`도 계속 동작합니다.
+????? `EXPORT-SHEETS`, `EXPORT-DWF`? ?? ?????.
 
 ### 기본 동작
 
@@ -106,7 +106,7 @@ python encode_euckr.py export_dwf_ui.dcl
 ### 최근 반영 사항
 
 - 자동 용지 맞춤 기본값 적용
-- `EXPORT-SHEETS` 명령 추가
+- `EXPORT-SMART` ?? ??
 - 샘플 선택 후 감지 개수 자동 미리보기
 - model space 기준 감지 강화
 - `PDF + DWF` 동시 출력 추가
@@ -133,8 +133,8 @@ It supports both `INSERT` block references and closed `LWPOLYLINE` borders, and 
 
 ### Features
 
-- Primary command: `EXPORT-SHEETS`
-- Backward-compatible alias: `EXPORT-DWF`
+- Primary command: `EXPORT-SMART`
+- Backward-compatible aliases: `EXPORT-SHEETS`, `EXPORT-DWF`
 - Detects both `INSERT` and closed `LWPOLYLINE` borders
 - Sample-pick mode automatically captures layer and ACI color
 - Automatically previews matching border count after sample selection
@@ -171,9 +171,9 @@ Place them in the same folder as the target `.dwg` whenever possible.
 1. Put `export_dwf_main.lsp` and `export_dwf_ui.dcl` next to your target drawing.
 2. Run `APPLOAD` in AutoCAD.
 3. Load `export_dwf_main.lsp`.
-4. Run `EXPORT-SHEETS`.
+4. Run `EXPORT-SMART`.
 
-`EXPORT-DWF` is still available as a compatibility alias.
+`EXPORT-SHEETS` and `EXPORT-DWF` are still available as compatibility aliases.
 
 ### Plot Behavior
 

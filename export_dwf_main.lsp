@@ -10,7 +10,7 @@
 ;;;   - export_dwf_main.lsp  (이 파일)
 ;;;   - export_dwf_ui.dcl    (다이얼로그)
 ;;;
-;;; 사용법: APPLOAD → export_dwf_main.lsp → 명령: EXPORT-SHEETS
+;;; ???: APPLOAD ? export_dwf_main.lsp ? ??: EXPORT-SMART
 ;;;
 ;;; 플롯 엔진 (버전 자동 선택):
 ;;;   R21+(2016~): ActiveX PlotToFile  → 실패 시 -PLOT 자동 폴백
@@ -341,6 +341,9 @@
           ((= dlg-result 1) (edwf:run-export doc))
           (T                (princ "\n취소됨.")))))))
   (princ))
+
+(defun c:EXPORT-SMART ()
+  (edwf:main-command))
 
 (defun c:EXPORT-SHEETS ()
   (edwf:main-command))
@@ -1177,6 +1180,6 @@
   (if (>= (edwf:acad-ver) 21)
     "ActiveX (실패 시 -PLOT 자동 폴백)"
     "-PLOT 명령")))
-(princ "\n  명령: EXPORT-SHEETS  (호환: EXPORT-DWF)")
+(princ "\n  ??: EXPORT-SMART  (??: EXPORT-SHEETS, EXPORT-DWF)")
 (princ "\n================================================")
 (princ)
